@@ -1,0 +1,5 @@
+(tests
+ (names lambdaCalculus simpleTypedLambda structuredLambda))
+(env
+  (dev
+    (flags (:standard -w -37) (:standard -w -32))))
