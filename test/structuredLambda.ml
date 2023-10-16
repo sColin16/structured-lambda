@@ -26,19 +26,18 @@ and base_type_to_string (base_type : base_type) =
   | Function func_list -> Printf.sprintf "{%s}" (func_type_to_string func_list)
 
 and func_type_to_string (func_list : unary_function list) =
-  String.concat ","
-    (List.map
-       (fun (arg, return) ->
-         Printf.sprintf "%s->%s" (type_to_string arg) (type_to_string return))
-       func_list)
+  String.concat "," (List.map unary_func_type_to_string func_list)
+
+and unary_func_type_to_string ((arg, return) : unary_function) =
+  Printf.sprintf "%s->%s" (type_to_string arg) (type_to_string return)
 
 let rec term_to_string (term : term) =
   match term with
   | Const name -> name
   | Variable var_num -> Printf.sprintf "%i" var_num
-  | Abstraction inner_term ->
-      let branches = List.map branch_to_string inner_term in
-      Printf.sprintf "\\.{%s}" (String.concat "," branches)
+  | Abstraction branches ->
+      let branch_strings = List.map branch_to_string branches in
+      Printf.sprintf "\\.{%s}" (String.concat "," branch_strings)
   | Application (t1, t2) ->
       Printf.sprintf "(%s) (%s)" (term_to_string t1) (term_to_string t2)
 
@@ -46,10 +45,6 @@ and branch_to_string (branch_type, branch_body) =
   Printf.sprintf "%s:%s"
     (type_to_string branch_type)
     (term_to_string branch_body)
-
-(* Represents "A | (A -> B)" *)
-let b = [ Label "A"; Function [ ([ Label "A" ], [ Label "B" ]) ] ]
-let c = [ Function [ ([ Label "A" ], [ Label "B" ]) ]; Label "A" ]
 
 let list_product (list1 : 'a list) (list2 : 'b list) =
   List.flatten (List.map (fun x1 -> List.map (fun x2 -> (x1, x2)) list2) list1)
@@ -60,29 +55,65 @@ let extract_first (list : ('a * 'b) list) =
 let extract_second (list : ('a * 'b) list) =
   List.map (fun (_, second) -> second) list
 
+(* TODO: remov duplicate and subtypes from the union after flattening *)
+let extract_composite_args (branches : unary_function list) =
+  List.flatten (extract_first branches)
+
+let extract_composite_return (branches : unary_function list) =
+  List.flatten (extract_second branches)
+
+let flat_map_opt2 (func : 'a -> 'b -> 'c) (opta : 'a option) (optb : 'b option)
+    =
+  match (opta, optb) with
+  | None, _ | _, None -> None
+  | Some a, Some b -> func a b
+
+let map_opt2 (func : 'a -> 'b -> 'c) (opta : 'a option) (optb : 'b option) =
+  flat_map_opt2 (fun a b -> Some (func a b)) opta optb
+
+let opt_list_to_list_opt (input : 'a option list) : 'a list option =
+  let list_opt =
+    List.fold_left
+      (fun acc elt_opt -> map_opt2 List.cons elt_opt acc)
+      (Some []) input
+  in
+  (* Reverse the list to maintain the order. Shouldn't really matter, but oh well *)
+  Option.map List.rev list_opt
+
+(** [is_empty_intersection type1 type2] determines if the intersection of the two types is uninhabited (empty)
+    More specfically, determines if the only subtype of the intersection of two types is the bottom type *)
 let rec is_empty_intersection (t1 : structured_type) (t2 : structured_type) =
+  (* The intersection of two union types is empty when the pairwise intersection of all componets are empty *)
   let union_pairs = list_product t1 t2 in
-  (* The intersection of two unions is empty if the intersection of all pairs is empty (or oe of the unions is empty) *)
   List.for_all is_empty_base_intersection union_pairs
 
 and is_empty_base_intersection type_pair =
   match type_pair with
+  (* The intersections of two labels is empty when the labels are not equal *)
   | Label a, Label b -> not (a = b)
-  | _, Function [] | Function [], _ ->
-      false (* unit type intersected with any base type is that base type *)
+  (* unit/top type intersected with any type is that type *)
+  | _, Function [] | Function [], _ -> false
+  (* Non-empty functions and labels have have uninhabited intersections *)
   | Label _, Function (_ :: _) | Function (_ :: _), Label _ -> true
+  (* The intersection of two non-unit function types is non-empty if each pair of unary function types is inhabited *)
   | Function first, Function second ->
       let function_pairs = list_product first second in
-      (* The intersection of two function types is non-empty if eah pair of function type is inhabited *)
-      (* Note that the cartesian product should not be empty *)
-      not
-        (List.for_all
-           (fun ((left_arg, left_return), (right_arg, right_return)) ->
-             is_empty_intersection left_arg right_arg
-             || not (is_empty_intersection left_return right_return))
-           function_pairs)
+      not (List.for_all non_empty_unary_func_intersection function_pairs)
 
+and non_empty_unary_func_intersection
+    (((arg1, return1), (arg2, return2)) : unary_function * unary_function) =
+  let empty_arg_intersection = is_empty_intersection arg1 arg2 in
+  let empty_return_intersection = is_empty_intersection return1 return2 in
+  (* Unary function intersection is inhabited if the argument types don't intersect (intersection
+     is simply the ad-hoc polymorphic function), or if the argument types do intersect, but the return
+     types have a non-empty intersection (the intersecting argument component maps to the intersection
+     of the return types)*)
+  empty_arg_intersection || not empty_return_intersection
+
+(** [is_subtype type1 type2] determines if [type1] is a subtype of [type2] *)
 let rec is_subtype (t1 : structured_type) (t2 : structured_type) =
+  (* a type is a subtype of another, if for every type in the first type,
+     there exists a supertype in the second type *)
   List.for_all
     (fun base_type1 ->
       List.exists (fun base_type2 -> is_base_subtype base_type1 base_type2) t2)
@@ -90,42 +121,53 @@ let rec is_subtype (t1 : structured_type) (t2 : structured_type) =
 
 and is_base_subtype (t1 : base_type) (t2 : base_type) =
   match (t1, t2) with
+  (* Labels are subtypes when they are the same label *)
   | Label a, Label b -> a = b
-  | Label _, Function [] -> true (* Subtype of the top type *)
-  | Label _, Function (_ :: _) | Function _, Label _ ->
-      false
-      (* Otherwise, there is no subtype relation b/w labels and functions *)
-  | Function first_list, Function second_list ->
-      let first_args = List.flatten (extract_first first_list) in
-      let second_args = List.flatten (extract_first second_list) in
-      let function_pairs = list_product first_list second_list in
+  (* Labels are considered a subtype of the unit/top type *)
+  | Label _, Function [] -> true
+  (* Otherwise, labels and functios have no subtype relation between them *)
+  | Label _, Function (_ :: _) | Function _, Label _ -> false
+  (* Two functions are subtypes if the first function accepts at least as many
+     argument types, and returns subtypes for every argument types that intersects *)
+  | Function first, Function second ->
+      let first_args = extract_composite_args first in
+      let second_args = extract_composite_args second in
+      let function_pairs = list_product first second in
       let exhaustive_arg_coverage = is_subtype second_args first_args in
       let return_type_constaint =
-        List.for_all
-          (fun ((left_arg, left_return), (right_arg, right_return)) ->
-            is_empty_intersection left_arg right_arg
-            || is_subtype left_return right_return)
-          function_pairs
+        List.for_all is_unary_func_subtype function_pairs
       in
       exhaustive_arg_coverage && return_type_constaint
 
+and is_unary_func_subtype
+    (((arg1, return1), (arg2, return2)) : unary_function * unary_function) =
+  let empty_arg_intersection = is_empty_intersection arg1 arg2 in
+  let return_subtype = is_subtype return1 return2 in
+  (* Two unary function are subtype-compatible if their arguments don't intersect (other check will
+      confirm arguments are exhaustive), or they do intersect, but the return type is a subtype
+     (to guarantee thefunction cannot return a supertype for the intersecting argument) *)
+  empty_arg_intersection || return_subtype
+
+(** [get_application_type func_type arg_type] determines the resulting type of
+    applying a term of type [arg_type] to a term of type [func_type], if
+    the function can be applied to the argument *)
 let rec get_application_type (func : structured_type) (arg : structured_type) =
-  let option_return_types = List.map (get_application_option_type arg) func in
-  let all_options_typed = List.for_all Option.is_some option_return_types in
-  if not all_options_typed then None
-  else
-    Some
-      (List.flatten
-         (List.map
-            (fun return_type -> Option.get return_type)
-            option_return_types))
+  (* The argument should be applicable to any function in the union, so acquire the type of applying the arg to each option *)
+  let return_types_opt = List.map (get_application_option_type arg) func in
+  (* Aggregate the return types - if anyof them were none, the application is not well-typed *)
+  let return_types = opt_list_to_list_opt return_types_opt in
+  (* Join all of the return types into a single union types *)
+  Option.map List.flatten return_types
 
 and get_application_option_type (arg : structured_type)
     (func_option : base_type) =
   match func_option with
+  (* A label type cannot be applied *)
   | Label _ -> None
+  (* An application against a funfction type is well-typed if the function accepts at least as many arguments.
+     The return type is the union of all return types that the argument might match with *)
   | Function func_list ->
-      let func_params = List.flatten (extract_first func_list) in
+      let func_params = extract_composite_args func_list in
       let exhaustive_arg_coverage = is_subtype arg func_params in
       if not exhaustive_arg_coverage then None
       else
@@ -136,6 +178,7 @@ and get_application_option_type (arg : structured_type)
                else acc @ func_return)
              [] func_list)
 
+(** [type_lambda_term term] determines the type of a term, if it is well-typed *)
 let rec type_lambda_term (term : term) =
   type_lambda_term_rec term TypeContextMap.empty (-1)
 
@@ -143,30 +186,29 @@ and type_lambda_term_rec (term : term) (context : type_context_map)
     (level : int) : structured_type option =
   match term with
   | Const name -> Some [ Label name ]
-  | Application (t1, t2) -> (
+  | Application (t1, t2) ->
       let left_type = type_lambda_term_rec t1 context level in
       let right_type = type_lambda_term_rec t2 context level in
-      match (left_type, right_type) with
-      | Some func_type, Some arg_type -> get_application_type func_type arg_type
-      | _ -> None)
+      flat_map_opt2 get_application_type left_type right_type
   (* TODO: confirm that the argument types all have apriwise empty intersections *)
   | Abstraction definitions ->
-      let body_types_opt =
-        List.map
-          (fun (branch_type, branch_body) ->
-            type_abstraction_branch branch_type branch_body context level)
-          definitions
-      in
-      let all_bodies_typed = List.for_all Option.is_some body_types_opt in
-      if not all_bodies_typed then None
+      let arg_types = extract_first definitions in
+      (* let arg_pairs = list_product arg_types arg_types in *)
+      let disjoint_args = true in (* TODO: check all pairs not with self for disjointedness *)
+      if not disjoint_args then None
       else
-        let arg_types = extract_first definitions in
-        let return_types = List.map Option.get body_types_opt in
-        Some [ Function (List.combine arg_types return_types) ]
+        let body_types_opt =
+          List.map (type_abstraction_branch context level) definitions
+        in
+        let return_types_opt = opt_list_to_list_opt body_types_opt in
+        Option.map
+          (fun return_types ->
+            [ Function (List.combine arg_types return_types) ])
+          return_types_opt
   | Variable var_num -> TypeContextMap.find_opt (level - var_num) context
 
-and type_abstraction_branch (branch_type : structured_type) (branch_body : term)
-    (context : type_context_map) (level : int) =
+and type_abstraction_branch (context : type_context_map) (level : int)
+    ((branch_type, branch_body) : structured_type * term) =
   type_lambda_term_rec branch_body
     (TypeContextMap.add (level + 1) branch_type context)
     (level + 1)
@@ -192,7 +234,11 @@ let rec eval (term : term) =
 and resolve_branch branches argument =
   (* TODO: can I always associate a base type with arguments to guarantee I can determine
      the appropriate branch, without needing to recompute each time? *)
-  let argument_type = Option.get (type_lambda_term argument) in
+  let argument_type =
+    match type_lambda_term argument with
+    | None -> raise (Invalid_argument "Yep")
+    | Some a -> a
+  in
   let _, resolved_branch =
     List.find
       (fun (branch_type, _) -> is_subtype argument_type branch_type)
@@ -249,6 +295,8 @@ and shift_rec (term : term) (shift_amt : int) (cutoff : int) =
 let test (name : string) (result : bool) =
   Printf.printf "%s: %s\n" (if result then "PASS" else "FAIL") name
 
+let b = [ Label "A"; Function [ ([ Label "A" ], [ Label "B" ]) ] ]
+let c = [ Function [ ([ Label "A" ], [ Label "B" ]) ]; Label "A" ]
 let a_label = Label "A"
 let b_label = Label "B"
 let c_label = Label "C"
