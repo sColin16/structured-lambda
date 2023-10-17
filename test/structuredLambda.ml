@@ -49,6 +49,19 @@ and branch_to_string (branch_type, branch_body) =
 let list_product (list1 : 'a list) (list2 : 'b list) =
   List.flatten (List.map (fun x1 -> List.map (fun x2 -> (x1, x2)) list2) list1)
 
+(** Gets all pairs of items in the list, not in any paticular order, excluding pairs with the same index *)
+let self_pairs (list : 'a list) =
+  let pair_list =
+    List.flatten
+      (List.mapi
+         (fun idx1 x1 -> List.mapi (fun idx2 x2 -> (idx2 > idx1, x1, x2)) list)
+         list)
+  in
+  List.filter_map
+    (fun (should_include, x1, x2) ->
+      if should_include then Some (x1, x2) else None)
+    pair_list
+
 let extract_first (list : ('a * 'b) list) =
   List.map (fun (first, _) -> first) list
 
@@ -134,12 +147,12 @@ and is_base_subtype (t1 : base_type) (t2 : base_type) =
       let second_args = extract_composite_args second in
       let function_pairs = list_product first second in
       let exhaustive_arg_coverage = is_subtype second_args first_args in
-      let return_type_constaint =
-        List.for_all is_unary_func_subtype function_pairs
+      let return_type_constraint =
+        List.for_all is_subtype_func function_pairs
       in
-      exhaustive_arg_coverage && return_type_constaint
+      exhaustive_arg_coverage && return_type_constraint
 
-and is_unary_func_subtype
+and is_subtype_func
     (((arg1, return1), (arg2, return2)) : unary_function * unary_function) =
   let args_intersect = has_intersection arg1 arg2 in
   let return_subtype = is_subtype return1 return2 in
@@ -164,7 +177,7 @@ and get_application_option_type (arg : structured_type)
   match func_option with
   (* A label type cannot be applied *)
   | Label _ -> None
-  (* An application against a funfction type is well-typed if the function accepts at least as many arguments.
+  (* An application against a function type is well-typed if the function accepts at least as many arguments.
      The return type is the union of all return types that the argument might match with *)
   | Function func_list ->
       let func_params = extract_composite_args func_list in
@@ -174,28 +187,33 @@ and get_application_option_type (arg : structured_type)
         Some
           (List.fold_left
              (fun acc (func_arg, func_return) ->
-               if has_intersection arg func_arg then acc @ func_return
-               else acc)
+               if has_intersection arg func_arg then acc @ func_return else acc)
              [] func_list)
 
 (** [type_lambda_term term] determines the type of a term, if it is well-typed *)
-let rec type_lambda_term (term : term) =
-  type_lambda_term_rec term TypeContextMap.empty (-1)
+let rec get_type (term : term) = get_type_rec term TypeContextMap.empty (-1)
 
-and type_lambda_term_rec (term : term) (context : type_context_map)
-    (level : int) : structured_type option =
+and get_type_rec (term : term) (context : type_context_map) (level : int) :
+    structured_type option =
   match term with
+  (* Constants always have label types *)
   | Const name -> Some [ Label name ]
+  (* Use the helper function to determine if an application is well-typed *)
   | Application (t1, t2) ->
-      let left_type = type_lambda_term_rec t1 context level in
-      let right_type = type_lambda_term_rec t2 context level in
+      let left_type = get_type_rec t1 context level in
+      let right_type = get_type_rec t2 context level in
       flat_map_opt2 get_application_type left_type right_type
-  (* TODO: confirm that the argument types all have apriwise empty intersections *)
+  (* Abstractions are well-typed if their argument types don't match
+     The return types of the body can be inferred recursively from the argument type *)
   | Abstraction definitions ->
       let arg_types = extract_first definitions in
-      (* let arg_pairs = list_product arg_types arg_types in *)
-      let disjoint_args = true in
-      (* TODO: check all pairs not with self for disjointedness. Might need a new function for that *)
+      let arg_pairs = self_pairs arg_types in
+      let disjoint_args =
+        not
+          (List.exists
+             (fun (arg1, arg2) -> has_intersection arg1 arg2)
+             arg_pairs)
+      in
       if not disjoint_args then None
       else
         let body_types_opt =
@@ -210,24 +228,28 @@ and type_lambda_term_rec (term : term) (context : type_context_map)
 
 and type_abstraction_branch (context : type_context_map) (level : int)
     ((branch_type, branch_body) : structured_type * term) =
-  type_lambda_term_rec branch_body
+  get_type_rec branch_body
     (TypeContextMap.add (level + 1) branch_type context)
     (level + 1)
 
+(** [eval term] evaluates a term to a value *)
 let rec eval (term : term) =
   match term with
-  (* Application of a const should't happen under the type system *)
+  (* Application of a const should't happen under the type system, others are considered values *)
   | Abstraction _ | Variable _
   | Application (Variable _, _)
   | Const _
   | Application (Const _, _) ->
       term
+  (* Evaluate the LHS of an application first *)
   | Application (Application (t1, t2), t3) ->
       let left_evaluated = eval (Application (t1, t2)) in
       eval (Application (left_evaluated, t3))
+  (* Then evaluate the RHS of an application *)
   | Application (Abstraction t1, Application (t2, t3)) ->
       let right_evaluated = eval (Application (t2, t3)) in
       eval (Application (Abstraction t1, right_evaluated))
+  (* Finally, determine the branch of the abstraction to use, and substitute *)
   | Application (Abstraction branches, t2) ->
       let executed_branch = resolve_branch branches t2 in
       eval (substitute t2 executed_branch)
@@ -235,11 +257,7 @@ let rec eval (term : term) =
 and resolve_branch branches argument =
   (* TODO: can I always associate a base type with arguments to guarantee I can determine
      the appropriate branch, without needing to recompute each time? *)
-  let argument_type =
-    match type_lambda_term argument with
-    | None -> raise (Invalid_argument "Yep")
-    | Some a -> a
-  in
+  let argument_type = Option.get (get_type argument) in
   let _, resolved_branch =
     List.find
       (fun (branch_type, _) -> is_subtype argument_type branch_type)
@@ -258,13 +276,12 @@ and substitute_rec (variable_num : int) (with_term : term) (in_term : term) =
   | Variable internal_num ->
       if variable_num == internal_num then with_term else in_term
   | Abstraction internal_term ->
-      (* TODO: I can definitely opimize to prevent duplicate shifts *)
+      let new_var_num = variable_num + 1 in
+      let new_with_term = shift with_term 1 in
       let substituted_bodies =
         List.map
           (fun (branch_type, branch_body) ->
-            ( branch_type,
-              substitute_rec (variable_num + 1) (shift with_term 1) branch_body
-            ))
+            (branch_type, substitute_rec new_var_num new_with_term branch_body))
           internal_term
       in
       Abstraction substituted_bodies
@@ -348,10 +365,7 @@ let large_arg_split_supertype =
   [ Function [ ([ a_label; b_label ], [ c_label; d_label; e_label ]) ] ]
 
 let () = test "simple empty" (not (has_intersection [ a_label ] [ b_label ]))
-
-let () =
-  test "simple identical" (has_intersection [ a_label ] [ a_label ])
-
+let () = test "simple identical" (has_intersection [ a_label ] [ a_label ])
 let () = test "out of order identical" (has_intersection b c)
 
 let () =
@@ -362,13 +376,8 @@ let () = test "zero and zero" (has_intersection [ zero ] [ zero ])
 let () = test "zero and one" (not (has_intersection [ zero ] [ one ]))
 let () = test "one and two" (not (has_intersection [ one ] [ two ]))
 let () = test "zero and two" (not (has_intersection [ zero ] [ two ]))
-
-let () =
-  test "nested test" (has_intersection [ nested_a ] [ nested_b ])
-
-let () =
-  test "joinable" (has_intersection [ joinable_a ] [ joinable_b ])
-
+let () = test "nested test" (has_intersection [ nested_a ] [ nested_b ])
+let () = test "joinable" (has_intersection [ joinable_a ] [ joinable_b ])
 let () = test "label reflexivity" (is_subtype [ a_label ] [ a_label ])
 let () = test "function reflexivity" (is_subtype [ one ] [ one ])
 
@@ -584,6 +593,13 @@ let () =
        [ a_label ]
     = Some [ c_label; d_label ])
 
+let () =
+  test "function arguments may not overlap"
+    (get_type
+       (Abstraction
+          [ ([ a_label ], Variable 0); ([ a_label; b_label ], Variable 0) ])
+    = None)
+
 let () = print_string (type_to_string large_arg_split_subtype)
 let true_label = Label "True"
 let false_label = Label "False"
@@ -666,17 +682,17 @@ let apply_or =
 let apply_not_eval = eval apply_not
 let apply_and_eval = eval apply_and
 let apply_or_eval = eval apply_or
-let not_term_type = Option.get (type_lambda_term not_term)
-let not_true_type = Option.get (type_lambda_term not_true)
-let not_false_type = Option.get (type_lambda_term not_false)
-let apply_bool_type = Option.get (type_lambda_term apply_bool)
-let apply_not_type = Option.get (type_lambda_term apply_not)
-let and_type = Option.get (type_lambda_term and_term)
-let or_type = Option.get (type_lambda_term or_term)
-let if_bool_type = Option.get (type_lambda_term if_bool_term)
-let apply_binary_type = Option.get (type_lambda_term apply_binary_bool)
-let apply_and_type = Option.get (type_lambda_term apply_and)
-let apply_or_type = Option.get (type_lambda_term apply_or)
+let not_term_type = Option.get (get_type not_term)
+let not_true_type = Option.get (get_type not_true)
+let not_false_type = Option.get (get_type not_false)
+let apply_bool_type = Option.get (get_type apply_bool)
+let apply_not_type = Option.get (get_type apply_not)
+let and_type = Option.get (get_type and_term)
+let or_type = Option.get (get_type or_term)
+let if_bool_type = Option.get (get_type if_bool_term)
+let apply_binary_type = Option.get (get_type apply_binary_bool)
+let apply_and_type = Option.get (get_type apply_and)
+let apply_or_type = Option.get (get_type apply_or)
 let () = Printf.printf "%s\n" (type_to_string not_term_type)
 let () = Printf.printf "%s\n" (type_to_string not_true_type)
 let () = Printf.printf "%s\n" (type_to_string not_false_type)
