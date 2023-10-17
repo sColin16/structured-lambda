@@ -62,8 +62,8 @@ let extract_composite_args (branches : unary_function list) =
 let extract_composite_return (branches : unary_function list) =
   List.flatten (extract_second branches)
 
-let flat_map_opt2 (func : 'a -> 'b -> 'c) (opta : 'a option) (optb : 'b option)
-    =
+let flat_map_opt2 (func : 'a -> 'b -> 'c option) (opta : 'a option)
+    (optb : 'b option) =
   match (opta, optb) with
   | None, _ | _, None -> None
   | Some a, Some b -> func a b
@@ -80,35 +80,35 @@ let opt_list_to_list_opt (input : 'a option list) : 'a list option =
   (* Reverse the list to maintain the order. Shouldn't really matter, but oh well *)
   Option.map List.rev list_opt
 
-(** [is_empty_intersection type1 type2] determines if the intersection of the two types is uninhabited (empty)
-    More specfically, determines if the only subtype of the intersection of two types is the bottom type *)
-let rec is_empty_intersection (t1 : structured_type) (t2 : structured_type) =
-  (* The intersection of two union types is empty when the pairwise intersection of all componets are empty *)
+(** [has_intersection type1 type2] determines if the intersection of the two types is inhabited
+    More specfically, determines if there exists a subtype of the intersection of the two types, other than the bottom type *)
+let rec has_intersection (t1 : structured_type) (t2 : structured_type) =
+  (* The intersection of two union types is inhabited if any pairs in the uion of inhaboted *)
   let union_pairs = list_product t1 t2 in
-  List.for_all is_empty_base_intersection union_pairs
+  List.exists has_intersection_base union_pairs
 
-and is_empty_base_intersection type_pair =
+and has_intersection_base type_pair =
   match type_pair with
-  (* The intersections of two labels is empty when the labels are not equal *)
-  | Label a, Label b -> not (a = b)
+  (* Two labels have an intersection only when they're equal *)
+  | Label a, Label b -> a = b
   (* unit/top type intersected with any type is that type *)
-  | _, Function [] | Function [], _ -> false
+  | _, Function [] | Function [], _ -> true
   (* Non-empty functions and labels have have uninhabited intersections *)
-  | Label _, Function (_ :: _) | Function (_ :: _), Label _ -> true
-  (* The intersection of two non-unit function types is non-empty if each pair of unary function types is inhabited *)
+  | Label _, Function (_ :: _) | Function (_ :: _), Label _ -> false
+  (* The intersection of two non-unit function types is inhabited if each pair of unary function types is inhabited *)
   | Function first, Function second ->
       let function_pairs = list_product first second in
-      not (List.for_all non_empty_unary_func_intersection function_pairs)
+      List.for_all has_intersection_func function_pairs
 
-and non_empty_unary_func_intersection
+and has_intersection_func
     (((arg1, return1), (arg2, return2)) : unary_function * unary_function) =
-  let empty_arg_intersection = is_empty_intersection arg1 arg2 in
-  let empty_return_intersection = is_empty_intersection return1 return2 in
+  let args_intersect = has_intersection arg1 arg2 in
+  let returns_intersect = has_intersection return1 return2 in
   (* Unary function intersection is inhabited if the argument types don't intersect (intersection
      is simply the ad-hoc polymorphic function), or if the argument types do intersect, but the return
-     types have a non-empty intersection (the intersecting argument component maps to the intersection
+     types do as well (the intersecting argument component maps to the intersection
      of the return types)*)
-  empty_arg_intersection || not empty_return_intersection
+  (not args_intersect) || returns_intersect
 
 (** [is_subtype type1 type2] determines if [type1] is a subtype of [type2] *)
 let rec is_subtype (t1 : structured_type) (t2 : structured_type) =
@@ -141,12 +141,12 @@ and is_base_subtype (t1 : base_type) (t2 : base_type) =
 
 and is_unary_func_subtype
     (((arg1, return1), (arg2, return2)) : unary_function * unary_function) =
-  let empty_arg_intersection = is_empty_intersection arg1 arg2 in
+  let args_intersect = has_intersection arg1 arg2 in
   let return_subtype = is_subtype return1 return2 in
   (* Two unary function are subtype-compatible if their arguments don't intersect (other check will
       confirm arguments are exhaustive), or they do intersect, but the return type is a subtype
      (to guarantee thefunction cannot return a supertype for the intersecting argument) *)
-  empty_arg_intersection || return_subtype
+  (not args_intersect) || return_subtype
 
 (** [get_application_type func_type arg_type] determines the resulting type of
     applying a term of type [arg_type] to a term of type [func_type], if
@@ -174,8 +174,8 @@ and get_application_option_type (arg : structured_type)
         Some
           (List.fold_left
              (fun acc (func_arg, func_return) ->
-               if is_empty_intersection arg func_arg then acc
-               else acc @ func_return)
+               if has_intersection arg func_arg then acc @ func_return
+               else acc)
              [] func_list)
 
 (** [type_lambda_term term] determines the type of a term, if it is well-typed *)
@@ -194,7 +194,8 @@ and type_lambda_term_rec (term : term) (context : type_context_map)
   | Abstraction definitions ->
       let arg_types = extract_first definitions in
       (* let arg_pairs = list_product arg_types arg_types in *)
-      let disjoint_args = true in (* TODO: check all pairs not with self for disjointedness *)
+      let disjoint_args = true in
+      (* TODO: check all pairs not with self for disjointedness. Might need a new function for that *)
       if not disjoint_args then None
       else
         let body_types_opt =
@@ -346,27 +347,27 @@ let large_arg_split_subtype =
 let large_arg_split_supertype =
   [ Function [ ([ a_label; b_label ], [ c_label; d_label; e_label ]) ] ]
 
-let () = test "simple empty" (is_empty_intersection [ a_label ] [ b_label ])
+let () = test "simple empty" (not (has_intersection [ a_label ] [ b_label ]))
 
 let () =
-  test "simple identical" (not (is_empty_intersection [ a_label ] [ a_label ]))
+  test "simple identical" (has_intersection [ a_label ] [ a_label ])
 
-let () = test "out of order identical" (not (is_empty_intersection b c))
+let () = test "out of order identical" (has_intersection b c)
 
 let () =
   test "single label inhabited"
-    (not (is_empty_intersection [ a_label; b_label ] [ b_label; c_label ]))
+    (has_intersection [ a_label; b_label ] [ b_label; c_label ])
 
-let () = test "zero and zero" (not (is_empty_intersection [ zero ] [ zero ]))
-let () = test "zero and one" (is_empty_intersection [ zero ] [ one ])
-let () = test "one and two" (is_empty_intersection [ one ] [ two ])
-let () = test "zero and two" (is_empty_intersection [ zero ] [ two ])
-
-let () =
-  test "nested test" (not (is_empty_intersection [ nested_a ] [ nested_b ]))
+let () = test "zero and zero" (has_intersection [ zero ] [ zero ])
+let () = test "zero and one" (not (has_intersection [ zero ] [ one ]))
+let () = test "one and two" (not (has_intersection [ one ] [ two ]))
+let () = test "zero and two" (not (has_intersection [ zero ] [ two ]))
 
 let () =
-  test "joinable" (not (is_empty_intersection [ joinable_a ] [ joinable_b ]))
+  test "nested test" (has_intersection [ nested_a ] [ nested_b ])
+
+let () =
+  test "joinable" (has_intersection [ joinable_a ] [ joinable_b ])
 
 let () = test "label reflexivity" (is_subtype [ a_label ] [ a_label ])
 let () = test "function reflexivity" (is_subtype [ one ] [ one ])
