@@ -8,6 +8,7 @@ Structured Lambda is a simply-typed lambda calculus, augmented with the followin
 - Union types
 - Ad-hoc polymorphic functions (corresponding to intersections of unary function types)
 - Subtyping
+- Mutual recursion contructs
 
 Structured Lambda's differentiating feature is its structural type system, which allows
 is to directly and umambiguously represent a wide range of common language constructs,
@@ -45,7 +46,6 @@ version of that same type.
 - Let constructs to enable more intuitively expressive programs
   - These simply provide syntactic sugar over abstractions
 - Recursive types to enable representations of truely infinite types, like integers and strings
-- First-class recursion constructs to enable the expression of all partially recursive
   functions, while maintaining the integrity of the type system
 - Universal type quantification to enable parametric polymorphism (aka "Generics")
   - Bounded quantification to assert properties of the quantified type
