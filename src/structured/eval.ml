@@ -1,5 +1,6 @@
 open Term
 open Type
+open Helpers
 
 (** [eval term] evaluates a term to a value *)
 let rec eval (term : term) =
@@ -10,10 +11,22 @@ let rec eval (term : term) =
   | Const _
   | Application (Const _, _) ->
       term
+  (* Evaluate the internals of a fix *)
+  | Fix term -> (
+      let inner_evaluated = eval term in
+      match inner_evaluated with
+      | Abstraction branches -> (
+          match evaluate_fix inner_evaluated branches with
+          | Some result -> result
+          | None -> Fix inner_evaluated)
+      | other -> Fix other)
   (* Evaluate the LHS of an application first *)
   | Application (Application (t1, t2), t3) ->
       let left_evaluated = eval (Application (t1, t2)) in
       eval (Application (left_evaluated, t3))
+  | Application (Fix t1, t2) ->
+      let fix_evaluated = eval (Fix t1) in
+      eval (Application (fix_evaluated, t2))
   (* Then evaluate the RHS of an application *)
   | Application (Abstraction t1, Application (t2, t3)) ->
       let right_evaluated = eval (Application (t2, t3)) in
@@ -59,6 +72,7 @@ and substitute_rec (variable_num : int) (with_term : term) (in_term : term) =
         ( substitute_rec variable_num with_term t1,
           substitute_rec variable_num with_term t2 )
   | Const _ -> in_term
+  | Fix internal_term -> Fix (substitute_rec variable_num with_term internal_term)
 
 and shift (term : term) (shift_amt : int) = shift_rec term shift_amt 0
 
@@ -78,3 +92,26 @@ and shift_rec (term : term) (shift_amt : int) (cutoff : int) =
   | Application (t1, t2) ->
       Application (shift_rec t1 shift_amt cutoff, shift_rec t2 shift_amt cutoff)
   | Const _ -> term
+  | Fix internal_tem-> Fix (shift_rec internal_tem shift_amt cutoff)
+
+and evaluate_fix (internal_term : term)
+    (abstraction_branches : (structured_type * term) list) =
+  let branch_terms = extract_second abstraction_branches in
+  let evaluated_branches =
+    List.map (evaluate_fix_branch internal_term) branch_terms
+  in
+  intersect_terms evaluated_branches
+
+and evaluate_fix_branch (internal_term : term) (branch_term : term) =
+  substitute (Fix internal_term) branch_term
+
+and intersect_terms (terms : term intersection) =
+  let abstraction_bodies_opt =
+    List.map
+      (fun term ->
+        match term with Abstraction branches -> Some branches | _ -> None)
+      terms
+  in
+  let abstraction_bodies = opt_list_to_list_opt abstraction_bodies_opt in
+  let unified_abstraction_bodies = Option.map List.flatten abstraction_bodies in
+  Option.map (fun x -> Abstraction x) unified_abstraction_bodies

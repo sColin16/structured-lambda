@@ -1,7 +1,10 @@
 open Helpers
 
-type structured_type = base_type list
-and base_type = Label of string | Function of unary_function list
+type 'a union = 'a list
+type 'a intersection = 'a list
+
+type structured_type = base_type union
+and base_type = Label of string | Function of unary_function intersection
 and unary_function = structured_type * structured_type
 
 module TypeContextMap = Map.Make (struct
@@ -18,7 +21,6 @@ let extract_composite_args (branches : unary_function list) =
 
 let extract_composite_return (branches : unary_function list) =
   List.flatten (extract_second branches)
-
 
 (** [has_intersection type1 type2] determines if the intersection of the two types is inhabited
     More specfically, determines if there exists a subtype of the intersection of the two types, other than the bottom type *)

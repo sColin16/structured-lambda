@@ -9,18 +9,35 @@ let a_label = Label "A"
 let b_label = Label "B"
 let c_label = Label "C"
 let d_label = Label "D"
-let e_label =  Label "E"
+let e_label = Label "E"
 let name_label = Label "Name"
 let val_label = Label "Val"
 let zero_label = Label "Zero"
 let succ_label = Label "Succ"
-let zero = Function [ ([ name_label ], [ zero_label ]) ]
+let zero_type = Function [ ([ name_label ], [ zero_label ]) ]
 
-let one =
-  Function [ ([ name_label ], [ succ_label ]); ([ val_label ], [ zero ]) ]
+let increment_type (num : base_type) =
+  Function [ ([ name_label ], [ succ_label ]); ([ val_label ], [ num ]) ]
 
-let two =
-  Function [ ([ name_label ], [ succ_label ]); ([ val_label ], [ one ]) ]
+let one_type = increment_type zero_type
+let two_type = increment_type one_type
+let three_type = increment_type two_type
+let four_type = increment_type three_type
+let five_type = increment_type four_type
+let six_type = increment_type five_type
+let seven_type = increment_type six_type
+
+let three_bit_num =
+  [
+    zero_type;
+    one_type;
+    two_type;
+    three_type;
+    four_type;
+    five_type;
+    six_type;
+    seven_type;
+  ]
 
 (* A -> (B -> C | D) *)
 let nested_a =
@@ -62,29 +79,30 @@ let () =
   test "single label inhabited"
     (has_intersection [ a_label; b_label ] [ b_label; c_label ])
 
-let () = test "zero and zero" (has_intersection [ zero ] [ zero ])
-let () = test "zero and one" (not (has_intersection [ zero ] [ one ]))
-let () = test "one and two" (not (has_intersection [ one ] [ two ]))
-let () = test "zero and two" (not (has_intersection [ zero ] [ two ]))
+let () = test "zero and zero" (has_intersection [ zero_type ] [ zero_type ])
+let () = test "zero and one" (not (has_intersection [ zero_type ] [ one_type ]))
+let () = test "one and two" (not (has_intersection [ one_type ] [ two_type ]))
+let () = test "zero and two" (not (has_intersection [ zero_type ] [ two_type ]))
 let () = test "nested test" (has_intersection [ nested_a ] [ nested_b ])
 let () = test "joinable" (has_intersection [ joinable_a ] [ joinable_b ])
 let () = test "label reflexivity" (is_subtype [ a_label ] [ a_label ])
-let () = test "function reflexivity" (is_subtype [ one ] [ one ])
+let () = test "function reflexivity" (is_subtype [ one_type ] [ one_type ])
 
 let () =
   test "label union subtyping A"
-    (is_subtype [ a_label ] [ a_label; b_label; one; zero ])
+    (is_subtype [ a_label ] [ a_label; b_label; one_type; zero_type ])
 
 let () =
   test "label union subtyping B"
-    (not (is_subtype [ a_label; b_label; one; zero ] [ a_label ]))
+    (not (is_subtype [ a_label; b_label; one_type; zero_type ] [ a_label ]))
 
 let () =
-  test "function union subtyping A" (is_subtype [ two ] [ two; one; a_label ])
+  test "function union subtyping A"
+    (is_subtype [ two_type ] [ two_type; one_type; a_label ])
 
 let () =
   test "function union subtyping B"
-    (not (is_subtype [ two; one; a_label ] [ two ]))
+    (not (is_subtype [ two_type; one_type; a_label ] [ two_type ]))
 
 let () = test "different labels A" (not (is_subtype [ a_label ] [ b_label ]))
 let () = test "different labels B" (not (is_subtype [ b_label ] [ a_label ]))
@@ -101,12 +119,19 @@ let () =
   test "intersecting labels B"
     (not (is_subtype [ b_label; c_label ] [ a_label; b_label ]))
 
-let () = test "different functions A" (not (is_subtype [ one ] [ two ]))
-let () = test "different functions B" (not (is_subtype [ two ] [ one ]))
+let () =
+  test "different functions A" (not (is_subtype [ one_type ] [ two_type ]))
+
+let () =
+  test "different functions B" (not (is_subtype [ two_type ] [ one_type ]))
+
 let () = test "top type of label A" (is_subtype [ a_label ] [ unit_type ])
 let () = test "top type of label B" (not (is_subtype [ unit_type ] [ a_label ]))
-let () = test "top type of function A" (is_subtype [ two ] [ unit_type ])
-let () = test "top type of function B" (not (is_subtype [ unit_type ] [ two ]))
+let () = test "top type of function A" (is_subtype [ two_type ] [ unit_type ])
+
+let () =
+  test "top type of function B" (not (is_subtype [ unit_type ] [ two_type ]))
+
 let () = test "bottom type of label A" (is_subtype [] [ a_label ])
 let () = test "bottom type of label B" (not (is_subtype [ a_label ] []))
 
@@ -291,12 +316,14 @@ let () =
     = None)
 
 let () = print_string (type_to_string large_arg_split_subtype)
+let () = print_string (type_to_string three_bit_num)
 let true_label = Label "True"
 let false_label = Label "False"
 let bool_type = [ true_label; false_label ]
 let unary_bool_type = Function [ (bool_type, bool_type) ]
 let binary_bool_type = Function [ (bool_type, [ unary_bool_type ]) ]
 let tertiary_bool_type = Function [ (bool_type, [ binary_bool_type ]) ]
+let unary_num_type = Function [ (three_bit_num, three_bit_num) ]
 
 let not_term =
   Abstraction
@@ -333,6 +360,101 @@ let if_bool_term =
 
 let not_true = Application (not_term, Const "True")
 let not_false = Application (not_term, Const "False")
+let zero_term = Abstraction [ ([ name_label ], Const "Zero") ]
+
+let increment_zero =
+  Abstraction
+    [
+      ( [ zero_type ],
+        Abstraction
+          [ ([ name_label ], Const "Succ"); ([ val_label ], Variable 1) ] );
+    ]
+
+let increment_small =
+  Abstraction
+    [
+      ( [ zero_type ],
+        Abstraction
+          [ ([ name_label ], Const "Succ"); ([ val_label ], Variable 1) ] );
+      ([ one_type ], zero_term);
+    ]
+
+let increment_two =   Abstraction
+[
+  ( [ zero_type; one_type ],
+    Abstraction
+      [ ([ name_label ], Const "Succ"); ([ val_label ], Variable 1) ] );
+  ([ two_type ], zero_term);
+]
+
+
+let increment_small_type_expected =
+  Function [ ([ zero_type ], [ one_type ]); ([ one_type ], [ zero_type ]) ]
+let increment_two_type_expected =
+  Function [ ([ zero_type; one_type ], [ one_type; two_type ]); ([ two_type ], [ zero_type ]) ]
+
+let increment_zero_type_expected = Function [ ([ zero_type ], [ one_type ]) ]
+
+let increment_three_bit =
+  Abstraction
+    [
+      ( [
+          zero_type;
+          one_type;
+          two_type;
+          three_type;
+          four_type;
+          five_type;
+          six_type;
+        ],
+        Abstraction
+          [ ([ name_label ], Const "Succ"); ([ val_label ], Variable 1) ] );
+      ([ seven_type ], zero_term);
+    ]
+
+let increment_three_bit_type_expected =
+  Function
+    [
+      ( [
+          zero_type;
+          one_type;
+          two_type;
+          three_type;
+          four_type;
+          five_type;
+          six_type;
+        ],
+        [
+          one_type;
+          two_type;
+          three_type;
+          four_type;
+          five_type;
+          six_type;
+          seven_type;
+        ] );
+      ([ seven_type ], [ zero_type ]);
+    ]
+
+let set_zero =
+  Abstraction
+    [
+      ( [
+          zero_type;
+          one_type;
+          two_type;
+          three_type;
+          four_type;
+          five_type;
+          six_type;
+          seven_type;
+        ],
+        Abstraction
+          [
+            ([ name_label ], Const "Succ");
+            ([ val_label ], Abstraction [ ([ name_label ], Const "Zero") ]);
+          ] );
+    ]
 
 let apply_bool =
   Abstraction
@@ -383,6 +505,11 @@ let if_bool_type = Option.get (get_type if_bool_term)
 let apply_binary_type = Option.get (get_type apply_binary_bool)
 let apply_and_type = Option.get (get_type apply_and)
 let apply_or_type = Option.get (get_type apply_or)
+let increment_three_bit_type = Option.get (get_type increment_three_bit)
+let set_zero_type = Option.get (get_type set_zero)
+let increment_zero_type = Option.get (get_type increment_zero)
+let increment_small_type = Option.get (get_type increment_small)
+let increment_two_type = Option.get (get_type increment_two)
 let () = Printf.printf "%s\n" (type_to_string not_term_type)
 let () = Printf.printf "%s\n" (type_to_string not_true_type)
 let () = Printf.printf "%s\n" (type_to_string not_false_type)
@@ -399,3 +526,47 @@ let () = Printf.printf "%s\n" (term_to_string apply_not_eval)
 let () = Printf.printf "%s\n" (term_to_string apply_and_eval)
 let () = Printf.printf "%s\n" (term_to_string apply_or_eval)
 let () = Printf.printf "%b\n" (is_subtype if_bool_type [ tertiary_bool_type ])
+let () = Printf.printf "%s\n" (type_to_string increment_three_bit_type)
+
+let () =
+  Printf.printf "%b\n" (is_subtype increment_three_bit_type [ unary_num_type ])
+
+let () = Printf.printf "%b\n" (is_subtype set_zero_type [ unary_num_type ])
+
+let () =
+  Printf.printf "%b\n"
+    (is_subtype increment_zero_type [ increment_zero_type_expected ])
+
+let () =
+  Printf.printf "%b\n"
+    (is_subtype [ increment_zero_type_expected ] increment_zero_type)
+
+let () =
+  Printf.printf "expected subtype of actual: %b\n"
+    (is_subtype [ increment_three_bit_type_expected ] increment_three_bit_type)
+
+let () =
+  Printf.printf "actual subtype of expected: %b\n"
+    (is_subtype increment_three_bit_type [ increment_three_bit_type_expected ])
+
+let () = Printf.printf "%s\n" (type_to_string increment_small_type)
+let () = Printf.printf "%s\n" (type_to_string [increment_small_type_expected])
+let () = Printf.printf "%b\n" (is_subtype increment_small_type [increment_small_type_expected])
+let () = Printf.printf "%b\n" (is_subtype [increment_small_type_expected] increment_small_type)
+let () = Printf.printf "%s\n" (type_to_string increment_two_type)
+let () = Printf.printf "%s\n" (type_to_string [increment_two_type_expected])
+let () = Printf.printf "%b\n" (is_subtype increment_two_type [increment_two_type_expected])
+let () = Printf.printf "%b\n" (is_subtype [increment_two_type_expected] increment_two_type)
+
+(* (Zero | Succ -> Zero) -> (Succ -> (Zero | Succ -> Zero)) not_subtype (Zero | Succ -> Zero) -> (Succ -> Zero | Succ -> Succ -> Zero)
+because
+(Succ -> (Zero | Succ -> Zero)) not_subtype (Succ -> Zero | Succ -> Succ -> Zero)
+Even though I would expect that to be true *)
+(* (
+  {
+    (
+      {Name->Zero}|{Name->Succ,Val->{Name->Zero}}) -> ({Name->Succ,Val->({Name->Zero}|{Name->Succ,Val->{Name->Zero}})}),
+      ({(Name)->(Succ),(Val)->({(Name)->(Succ),(Val)->({(Name)->(Zero)})})})->({(Name)->(Zero)}
+    )
+  }
+) *)

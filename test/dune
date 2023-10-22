@@ -1,5 +1,5 @@
 (tests
- (names lambdaCalculusTest simpleTypedLambda structuredLambdaTest)
+ (names lambdaCalculusTest simpleTypedLambda structuredLambdaTest structuredLambdaArithmetic structuredLambdaBoolean structuredLambdaMixed)
  (libraries lambdaCalculus))
 
 (env

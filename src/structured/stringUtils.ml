@@ -25,6 +25,7 @@ let rec term_to_string (term : term) =
       Printf.sprintf "\\.{%s}" (String.concat "," branch_strings)
   | Application (t1, t2) ->
       Printf.sprintf "(%s) (%s)" (term_to_string t1) (term_to_string t2)
+  | Fix term -> Printf.sprintf "fix (%s)" (term_to_string term)
 
 and branch_to_string (branch_type, branch_body) =
   Printf.sprintf "%s:%s"
