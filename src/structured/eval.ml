@@ -11,21 +11,17 @@ let rec eval (term : term) =
   | Const _
   | Application (Const _, _) ->
       term
-  (* Evaluate the internals of a fix *)
-  | Fix term -> (
-      let inner_evaluated = eval term in
-      match inner_evaluated with
-      | Abstraction branches -> (
-          match evaluate_fix inner_evaluated branches with
-          | Some result -> result
-          | None -> Fix inner_evaluated)
-      | other -> Fix other)
+  (* Evaluate a fix point abstraction *)
+  | FixAbs branches -> (
+      match evaluate_fix branches with
+      | Some result -> result
+      | None -> FixAbs branches)
   (* Evaluate the LHS of an application first *)
   | Application (Application (t1, t2), t3) ->
       let left_evaluated = eval (Application (t1, t2)) in
       eval (Application (left_evaluated, t3))
-  | Application (Fix t1, t2) ->
-      let fix_evaluated = eval (Fix t1) in
+  | Application (FixAbs t1, t2) ->
+      let fix_evaluated = eval (FixAbs t1) in
       eval (Application (fix_evaluated, t2))
   (* Then evaluate the RHS of an application *)
   | Application (Abstraction t1, Application (t2, t3)) ->
@@ -72,7 +68,17 @@ and substitute_rec (variable_num : int) (with_term : term) (in_term : term) =
         ( substitute_rec variable_num with_term t1,
           substitute_rec variable_num with_term t2 )
   | Const _ -> in_term
-  | Fix internal_term -> Fix (substitute_rec variable_num with_term internal_term)
+  (* TODO: eliminate the duplication with abstraction here *)
+  | FixAbs branches ->
+      let new_var_num = variable_num + 1 in
+      let new_with_term = shift with_term 1 in
+      let substitued_bodies =
+        List.map
+          (fun (branch_type, branch_body) ->
+            (branch_type, substitute_rec new_var_num new_with_term branch_body))
+          branches
+      in
+      FixAbs substitued_bodies
 
 and shift (term : term) (shift_amt : int) = shift_rec term shift_amt 0
 
@@ -92,18 +98,24 @@ and shift_rec (term : term) (shift_amt : int) (cutoff : int) =
   | Application (t1, t2) ->
       Application (shift_rec t1 shift_amt cutoff, shift_rec t2 shift_amt cutoff)
   | Const _ -> term
-  | Fix internal_tem-> Fix (shift_rec internal_tem shift_amt cutoff)
+  (* TODO: eliminate duplication with Abstraction here *)
+  | FixAbs branches ->
+      let mapped_branches =
+        List.map
+        (fun (branch_type, branch_body) ->
+          (branch_type, shift_rec branch_body shift_amt (cutoff + 1)))
+        branches
+        in FixAbs mapped_branches
 
-and evaluate_fix (internal_term : term)
-    (abstraction_branches : (structured_type * term) list) =
+and evaluate_fix (abstraction_branches : (structured_type * term) list) =
   let branch_terms = extract_second abstraction_branches in
   let evaluated_branches =
-    List.map (evaluate_fix_branch internal_term) branch_terms
+    List.map (evaluate_fix_branch abstraction_branches) branch_terms
   in
   intersect_terms evaluated_branches
 
-and evaluate_fix_branch (internal_term : term) (branch_term : term) =
-  substitute (Fix internal_term) branch_term
+and evaluate_fix_branch (all_branches: (structured_type * term) list) (branch_term : term) =
+  substitute (FixAbs all_branches) branch_term
 
 and intersect_terms (terms : term intersection) =
   let abstraction_bodies_opt =

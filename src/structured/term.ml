@@ -6,7 +6,7 @@ type term =
   | Application of term * term
   | Variable of int
   | Const of string
-  | Fix of term
+  | FixAbs of (structured_type * term) list
 
 (** [type_lambda_term term] determines the type of a term, if it is well-typed *)
 let rec get_type (term : term) = get_type_rec term TypeContextMap.empty (-1)
@@ -43,31 +43,30 @@ and get_type_rec (term : term) (context : type_context_map) (level : int) :
             [ Function (List.combine arg_types return_types) ])
           return_types_opt
   | Variable var_num -> TypeContextMap.find_opt (level - var_num) context
-  | Fix internal_term ->
-    let internal_type_opt = get_type_rec internal_term context level in
-    Option.bind internal_type_opt type_fix
+  | FixAbs definitions ->
+    let arg_types = extract_first definitions in
+    let tentative_type_opt = distribute_intersection arg_types in
+    match tentative_type_opt with
+    | None -> None
+    | Some tentative_type -> (
+      let new_level = level + 1 in
+      let new_context = TypeContextMap.add new_level tentative_type context in
+      let branch_bodies = extract_second definitions in
+      let return_types_opt_list = List.map (fun body -> get_type_rec body new_context new_level) branch_bodies in
+      let return_types_opt = opt_list_to_list_opt return_types_opt_list in
+      match return_types_opt with
+      | None -> None
+      | Some return_types -> (
+        let subtype_invariant_met = List.for_all2 (fun arg_type return_type -> is_subtype return_type arg_type) arg_types return_types in
+        if subtype_invariant_met then Some tentative_type else None
+      )
+    )
 
 and type_abstraction_branch (context : type_context_map) (level : int)
     ((branch_type, branch_body) : structured_type * term) =
   get_type_rec branch_body
     (TypeContextMap.add (level + 1) branch_type context)
     (level + 1)
-
-and type_fix (fix_body: structured_type) =
-  let fixed_options = List.map (type_single_fix) fix_body in
-  let unified_options = opt_list_to_list_opt fixed_options in
-  Option.map List.flatten unified_options
-
-and type_single_fix (fix: base_type) =
-  match fix with
-  | Label _ -> None
-  | Function unary_intersections -> type_fix_function unary_intersections
-
-and type_fix_function (function_type: unary_function list) =
-  let valid_args_opt = List.map (fun (arg_type, return_type) -> if is_subtype return_type arg_type then Some arg_type else None) function_type in
-  let arg_intersection = opt_list_to_list_opt valid_args_opt in
-  let normal_form = Option.bind arg_intersection distribute_intersection in
-  normal_form
 
 and distribute_intersection (type_intersection: base_type union intersection): structured_type option =
   let distributed_result: base_type intersection union  = multi_list_product type_intersection in
