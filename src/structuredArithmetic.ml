@@ -64,52 +64,60 @@ let decrement =
 let decrement_type = get_type_unsafe decrement
 
 let add =
-  FixAbs
-    [
-      ( [ binary_num_op ],
-        Abstraction
-          [
-            ([ zero_type ], Abstraction [ (three_bit_num, Variable 0) ]);
-            ( [
-                one_type;
-                two_type;
-                three_type;
-                four_type;
-                five_type;
-                six_type;
-                seven_type;
-              ],
-              Abstraction
-                [
-                  ( three_bit_num,
-                    Application
-                      ( Application
-                          (Variable 2, Application (decrement, Variable 1)),
-                        Application (increment, Variable 0) ) );
-                ] );
-          ] );
-    ]
+  Fix
+    (Abstraction
+       [
+         ( [ binary_num_op ],
+           Abstraction
+             [
+               ([ zero_type ], Abstraction [ (three_bit_num, Variable 0) ]);
+               ( [
+                   one_type;
+                   two_type;
+                   three_type;
+                   four_type;
+                   five_type;
+                   six_type;
+                   seven_type;
+                 ],
+                 Abstraction
+                   [
+                     ( three_bit_num,
+                       Application
+                         ( Application
+                             (Variable 2, Application (decrement, Variable 1)),
+                           Application (increment, Variable 0) ) );
+                   ] );
+             ] );
+       ])
 
 let add_type = get_type_unsafe add
 
 let fib =
-  FixAbs
-    [
-      ( [ unary_num_op ],
-        Abstraction
-          [
-            ([ zero_type; one_type ], one_term);
-            ( [
-                two_type; three_type; four_type; five_type; six_type; seven_type;
-              ],
-              Application
-                ( Application
-                    ( add,
-                      Application
-                        (Variable 1, Application (decrement, Variable 0)) ),
-                  Application
-                    ( Variable 1,
-                      Application
-                        (decrement, Application (decrement, Variable 0)) ) ) );
-          ] );
-    ]
+  Fix
+    (Abstraction
+       [
+         ( [ unary_num_op ],
+           Abstraction
+             [
+               ([ zero_type; one_type ], one_term);
+               ( [
+                   two_type;
+                   three_type;
+                   four_type;
+                   five_type;
+                   six_type;
+                   seven_type;
+                 ],
+                 Application
+                   ( Application
+                       ( add,
+                         Application
+                           (Variable 1, Application (decrement, Variable 0)) ),
+                     Application
+                       ( Variable 1,
+                         Application
+                           (decrement, Application (decrement, Variable 0)) ) )
+               );
+             ] );
+       ])
