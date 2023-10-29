@@ -8,7 +8,7 @@ Structured Lambda is a simply-typed lambda calculus, augmented with the followin
 - Union types
 - Ad-hoc polymorphic functions (corresponding to intersections of unary function types)
 - Subtyping
-- Mutual recursion contructs
+- General recursion
 
 Structured Lambda's differentiating feature is its structural type system, which allows
 is to directly and umambiguously represent a wide range of common language constructs,
