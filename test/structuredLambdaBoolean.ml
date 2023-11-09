@@ -4,7 +4,6 @@ open LambdaCalculus.StructuredBool
 let test (name : string) (result : bool) =
   Printf.printf "%s: %s\n" (if result then "PASS" else "FAIL") name
 
-let get_type_unsafe term = Option.get (get_type term)
 let evaluates_to term value = eval term = value
 
 let () =
@@ -16,10 +15,10 @@ let () = test "or is binary bool op" (is_subtype or_type [ binary_bool_op ])
 let () = test "if is ternary bool op" (is_subtype if_type [ ternary_bool_op ])
 
 let () =
-  test "not true" (evaluates_to (Application (not, true_term)) false_term)
+  test "not true" (evaluates_to (Application (not_term, true_term)) false_term)
 
 let () =
-  test "not false" (evaluates_to (Application (not, false_term)) true_term)
+  test "not false" (evaluates_to (Application (not_term, false_term)) true_term)
 
 let () = test "true and true" (evaluates_to (Application(Application(and_term, true_term), true_term)) true_term)
 let () = test "true and false" (evaluates_to (Application(Application(and_term, true_term), false_term)) false_term)

@@ -1,6 +1,7 @@
 open Structured
 
 let get_type_unsafe term = Option.get (get_type term)
+let get_typed_term_unsafe term = (term, get_type_unsafe term)
 
 let true_type = Label "True"
 let false_type = Label "False"
@@ -13,10 +14,10 @@ let false_term = Const "False"
 let identity = Abstraction [ (bool_type, Variable 0) ]
 let identity_type = get_type_unsafe identity
 
-let not =
+let not_term =
   Abstraction [ ([ true_type ], false_term); ([ false_type ], true_term) ]
 
-let not_type = get_type_unsafe not
+let not_type = get_type_unsafe not_term
 
 let and_term =
   Abstraction

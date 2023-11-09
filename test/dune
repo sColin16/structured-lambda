@@ -1,7 +1,16 @@
 (tests
- (names lambdaCalculusTest simpleTypedLambda structuredLambdaTest structuredLambdaArithmetic structuredLambdaBoolean structuredLambdaMixed)
+ (names
+  lambdaCalculusTest
+  simpleTypedLambda
+  structuredLambdaTest
+  structuredLambdaArithmetic
+  structuredLambdaBoolean
+  structuredLambdaMixed
+  structuredLambdaUnions)
  (libraries lambdaCalculus))
 
 (env
-  (dev
-    (flags (:standard -w -37) (:standard -w -32))))
+ (dev
+  (flags
+   (:standard -w -37)
+   (:standard -w -32))))
