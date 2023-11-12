@@ -6,6 +6,7 @@
   structuredLambdaArithmetic
   structuredLambdaBoolean
   structuredLambdaMixed
+  structuredLambdaCoinductive
   structuredLambdaUnions)
  (libraries lambdaCalculus))
 
