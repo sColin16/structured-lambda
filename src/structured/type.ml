@@ -19,7 +19,8 @@ type 'a intersection = 'a list
     we need to be able to reference the recursive context freely so we can express types
     like even or odd, etc.
 *)
-type structured_type = union_type * recursive_context
+
+type structured_type = { union : union_type; context : recursive_context }
 and union_type = base_type list
 
 and base_type =
@@ -52,6 +53,9 @@ end)
 
 type type_context_map = union_type TypeContextMap.t
 
+let build_structured_type (union : union_type) (context : recursive_context) =
+  { union; context }
+
 (* TODO: remove duplicate and subtypes from the union after flattening *)
 let extract_composite_args (branches : unary_function list) =
   List.flatten (extract_first branches)
@@ -59,6 +63,7 @@ let extract_composite_args (branches : unary_function list) =
 let extract_composite_return (branches : unary_function list) =
   List.flatten (extract_second branches)
 
+(* TODO: consider just accepting a structured type here *)
 let flatten_union (union : union_type) (context : recursive_context) :
     flat_union_type =
   List.flatten
@@ -70,36 +75,44 @@ let flatten_union (union : union_type) (context : recursive_context) :
          | TypeVar n -> List.nth context n)
        union)
 
+(* TODO: consider just accepted a structured type here *)
 let flatten_union_contractive (union : union_type) (context : recursive_context)
-    : union_type =
+    =
   let flat_union = flatten_union union context in
-  List.map
-    (fun base_type ->
-      match base_type with
-      | FLabel a -> Label a
-      | FIntersection functions -> Intersection functions)
-    flat_union
+  let converted_union =
+    List.map
+      (fun base_type ->
+        match base_type with
+        | FLabel a -> Label a
+        | FIntersection functions -> Intersection functions)
+      flat_union
+  in
+  build_structured_type converted_union context
 
 let expand_type_var_contractive (var_num : int) (context : recursive_context) =
   let flat_union = List.nth context var_num in
-  List.map
-    (fun base_type ->
-      match base_type with
-      | FLabel a -> Label a
-      | FIntersection a -> Intersection a)
-    flat_union
+  let converted_union =
+    List.map
+      (fun base_type ->
+        match base_type with
+        | FLabel a -> Label a
+        | FIntersection a -> Intersection a)
+      flat_union
+  in
+  build_structured_type converted_union context
 
 (** [has_intersection type1 type2] determines if the intersection of the two types is inhabited
     More specfically, determines if there exists a subtype of the intersection of the two types, other than the bottom type *)
 let rec has_intersection (t1 : structured_type) (t2 : structured_type) =
-  has_intersection_union_rec t1 t2 TypeVarPairSet.empty
+  has_intersection_rec t1 t2 TypeVarPairSet.empty
 
-and has_intersection_union_rec ((t1, c1) : structured_type)
-    ((t2, c2) : structured_type) (encountered_type_vars : TypeVarPairSet.t) =
-  let base_pairs = list_product t1 t2 in
+and has_intersection_rec (t1 : structured_type) (t2 : structured_type)
+    (encountered_type_vars : TypeVarPairSet.t) =
+  let base_pairs = list_product t1.union t2.union in
   List.exists
     (fun (b1, b2) ->
-      has_intersection_base_rec (b1, c1) (b2, c2) encountered_type_vars)
+      has_intersection_base_rec (b1, t1.context) (b2, t2.context)
+        encountered_type_vars)
     base_pairs
 
 and has_intersection_base_rec ((t1, c1) : base_type * recursive_context)
@@ -122,12 +135,14 @@ and has_intersection_base_rec ((t1, c1) : base_type * recursive_context)
         function_pairs
   (* Handle cases where one of the types is a type variable, expanding that type out and recursing *)
   | TypeVar n, Label _ | TypeVar n, Intersection _ ->
-      has_intersection_union_rec
-        (expand_type_var_contractive n c1, c1)
-        ([ t2 ], c2) encountered_type_vars
+      has_intersection_rec
+        (expand_type_var_contractive n c1)
+        (build_structured_type [ t2 ] c2)
+        encountered_type_vars
   | Label _, TypeVar n | Intersection _, TypeVar n ->
-      has_intersection_union_rec ([ t1 ], c1)
-        (expand_type_var_contractive n c2, c2)
+      has_intersection_rec
+        (build_structured_type [ t1 ] c1)
+        (expand_type_var_contractive n c2)
         encountered_type_vars
   (* Finally, handle the potential loop case *)
   | TypeVar n, TypeVar m ->
@@ -137,9 +152,9 @@ and has_intersection_base_rec ((t1, c1) : base_type * recursive_context)
       if TypeVarPairSet.mem (n, m) encountered_type_vars then true
       else
         (* If we don't encounter a loop, we expand both sides and recurse, tracking this pair to detect a future loop *)
-        has_intersection_union_rec
-          (expand_type_var_contractive n c1, c1)
-          (expand_type_var_contractive m c2, c2)
+        has_intersection_rec
+          (expand_type_var_contractive n c1)
+          (expand_type_var_contractive m c2)
           (TypeVarPairSet.add (n, m) encountered_type_vars)
 
 and has_intersection_func
@@ -147,10 +162,16 @@ and has_intersection_func
     (((arg2, return2), c2) : unary_function * recursive_context)
     (encountered_type_vars : TypeVarPairSet.t) =
   let args_intersect =
-    has_intersection_union_rec (arg1, c1) (arg2, c2) encountered_type_vars
+    has_intersection_rec
+      (build_structured_type arg1 c1)
+      (build_structured_type arg2 c2)
+      encountered_type_vars
   in
   let returns_intersect =
-    has_intersection_union_rec (return1, c1) (return2, c2) encountered_type_vars
+    has_intersection_rec
+      (build_structured_type return1 c1)
+      (build_structured_type return2 c2)
+      encountered_type_vars
   in
   (* Unary function intersection is inhabited if the argument types don't intersect (intersection
      is simply the ad-hoc polymorphic function), or if the argument types do intersect, but the return
@@ -159,8 +180,8 @@ and has_intersection_func
   (not args_intersect) || returns_intersect
 
 (** [is_unary union_type] determines if a type cannot be written as the union of two distinct, unrelated types *)
-let rec is_unary ((union, context) : structured_type) =
-  let flat_union = flatten_union union context in
+let rec is_unary (t : structured_type) =
+  let flat_union = flatten_union t.union t.context in
   match flat_union with
   (* Under the rewriting equality rule, the empty type is considered "unary" even though it's really more nullary *)
   | [] -> true
@@ -173,7 +194,8 @@ let rec is_unary ((union, context) : structured_type) =
       | FIntersection functions ->
           List.for_all
             (fun (arg, return) ->
-              is_unary (arg, context) && is_unary (return, context))
+              is_unary (build_structured_type arg t.context)
+              && is_unary (build_structured_type return t.context))
             functions)
   (* A multiple type union is not considered unary. In theory it may be possible to rewrite as a single base type
      but we can do that later *)
@@ -183,14 +205,14 @@ let rec is_unary ((union, context) : structured_type) =
 let rec is_subtype (t1 : structured_type) (t2 : structured_type) =
   is_subtype_union_rec t1 t2 TypeVarLoop.empty
 
-and is_subtype_union_rec ((t1, c1) : structured_type)
-    ((t2, c2) : structured_type) (encountered_type_vars : TypeVarLoop.t) =
+and is_subtype_union_rec (t1 : structured_type) (t2 : structured_type)
+    (encountered_type_vars : TypeVarLoop.t) =
   (* A union type is a subtype of another union type, if each base type in the first union is a subtype
      of the second union *)
   List.for_all
     (fun base_type ->
-      is_base_union_subtype (base_type, c1) (t2, c2) encountered_type_vars)
-    t1
+      is_base_union_subtype (base_type, t1.context) t2 encountered_type_vars)
+    t1.union
 
 and is_base_union_subtype ((t1, c1) : base_type * recursive_context)
     (t2 : structured_type) (encountered_type_vars : TypeVarLoop.t) =
@@ -200,9 +222,8 @@ and is_base_union_subtype ((t1, c1) : base_type * recursive_context)
       is_function_union_subtype (functions, c1) t2 encountered_type_vars
   | TypeVar n -> is_typevar_union_subtype (n, c1) t2 encountered_type_vars
 
-and is_label_union_subtype (label : string) ((union, context) : structured_type)
-    =
-  let flat_union = flatten_union union context in
+and is_label_union_subtype (label : string) (t : structured_type) =
+  let flat_union = flatten_union t.union t.context in
   (* A label is a subtype of an equivalent label in the union, or the top type *)
   List.exists
     (fun flat_union_elt ->
@@ -214,10 +235,9 @@ and is_label_union_subtype (label : string) ((union, context) : structured_type)
 
 and is_function_union_subtype
     ((functions, context1) : unary_function intersection * recursive_context)
-    ((union, context2) : structured_type)
-    (encountered_type_vars : TypeVarLoop.t) =
+    (t : structured_type) (encountered_type_vars : TypeVarLoop.t) =
   (* Flatten the type with contractivity to only labels and intersections *)
-  let flat_union = flatten_union union context2 in
+  let flat_union = flatten_union t.union t.context in
   (* Filter out the label types because they don't assist in subtypeing an intersection *)
   let union_of_intersections =
     List.filter_map
@@ -230,7 +250,7 @@ and is_function_union_subtype
   (* First, check if there a intersection types in the union that is a supertype directly *)
   let is_direct_subtype =
     is_function_subtype_direct (functions, context1)
-      (union_of_intersections, context2)
+      (union_of_intersections, t.context)
       encountered_type_vars
   in
   if is_direct_subtype then true
@@ -238,42 +258,39 @@ and is_function_union_subtype
     (* Otherwise, check if it's an indirect subtype of the entire union *)
     let is_indirect_subtype =
       is_function_subtype_indirect (functions, context1)
-        (union_of_intersections, context2)
+        (union_of_intersections, t.context)
         encountered_type_vars
     in
     is_indirect_subtype
 
 and is_typevar_union_subtype ((var_num, context1) : int * recursive_context)
-    ((union, context2) : structured_type)
-    (encountered_type_vars : TypeVarLoop.t) =
+    (t : structured_type) (encountered_type_vars : TypeVarLoop.t) =
   let union_contains_typevars =
     List.exists
       (fun base_type ->
         match base_type with
         | TypeVar _ -> true
         | Label _ | Intersection _ -> false)
-      union
+      t.union
   in
   (* If we encounter a loop with type vars, subtyping is valid for coninductive types.
      For inductive types, we will need to perform additional checks *)
   if
     union_contains_typevars
-    && TypeVarLoop.mem (var_num, union) encountered_type_vars
+    && TypeVarLoop.mem (var_num, t.union) encountered_type_vars
   then true
   else
     (* Otherwise, expand both sides, removing all type vars *)
     let expanded_type_var = expand_type_var_contractive var_num context1 in
-    let flat_union = flatten_union_contractive union context2 in
+    let flat_union = flatten_union_contractive t.union t.context in
     (* If the original union had type vars, track it for loop detection *)
     let new_encountered_var =
       if union_contains_typevars then
-        TypeVarLoop.add (var_num, union) encountered_type_vars
+        TypeVarLoop.add (var_num, t.union) encountered_type_vars
       else encountered_type_vars
     in
     (* And recurse on both sides *)
-    is_subtype_union_rec
-      (expanded_type_var, context1)
-      (flat_union, context2) new_encountered_var
+    is_subtype_union_rec expanded_type_var flat_union new_encountered_var
 
 and is_function_subtype_direct
     ((functions, context1) : unary_function intersection * recursive_context)
@@ -301,7 +318,9 @@ and is_function_subtype_indirect
       let intersection_of_unions = multi_list_product union_of_intersections in
       (* We only consider functions in the subtype with arguments in unary form, per splitting rule *)
       let unary_form_functions =
-        List.filter (fun (arg, _) -> is_unary (arg, context1)) functions
+        List.filter
+          (fun (arg, _) -> is_unary (build_structured_type arg context1))
+          functions
       in
       (* We must prove the unary form function intersection is a subtype of each union in the intersection *)
       let does_subtype =
@@ -324,7 +343,9 @@ and is_intersection_subtype
   let function_pairs = list_product functions1 functions2 in
   (* The function1's argument types (unioned together) must be a supertype of function2's argument types (unioned together) *)
   let exhaustive_arg_coverage =
-    is_subtype_union_rec (second_args, context2) (first_args, context1)
+    is_subtype_union_rec
+      (build_structured_type second_args context2)
+      (build_structured_type first_args context1)
       encountered_type_vars
   in
   (* Every pair of unary functions must be "subtype compatible," returning a subtype is the arg types intersect *)
@@ -348,14 +369,17 @@ and is_intersection_union_subtype
       let relevant_functions =
         List.filter
           (fun (super_arg, _) ->
-            is_subtype_union_rec (super_arg, context2) (sub_arg, context1)
+            is_subtype_union_rec
+              (build_structured_type super_arg context2)
+              (build_structured_type sub_arg context1)
               encountered_type_vars)
           function_union
       in
       let composite_return = extract_composite_return relevant_functions in
       (* It is a subtype if the return types of all functions with argument subtypes form a supertype *)
-      is_subtype_union_rec (sub_return, context1)
-        (composite_return, context2)
+      is_subtype_union_rec
+        (build_structured_type sub_return context1)
+        (build_structured_type composite_return context2)
         encountered_type_vars)
     unary_form_functions
 
@@ -363,9 +387,15 @@ and is_func_subtype_compatible
     (((arg1, return1), context1) : unary_function * recursive_context)
     (((arg2, return2), context2) : unary_function * recursive_context)
     (encountered_type_vars : TypeVarLoop.t) =
-  let args_intersect = has_intersection (arg1, context1) (arg2, context2) in
+  let args_intersect =
+    has_intersection
+      (build_structured_type arg1 context1)
+      (build_structured_type arg2 context2)
+  in
   let return_subtype =
-    is_subtype_union_rec (return1, context1) (return2, context2)
+    is_subtype_union_rec
+      (build_structured_type return1 context1)
+      (build_structured_type return2 context2)
       encountered_type_vars
   in
   (* Two unary function are subtype-compatible if their arguments don't
@@ -377,29 +407,29 @@ and is_func_subtype_compatible
 (** [get_application_type func_type arg_type] determines the resulting type of
     applying a term of type [arg_type] to a term of type [func_type], if
     the function can be applied to the argument *)
-let rec get_application_type ((func, context1) : structured_type)
-    ((arg, context2) : structured_type) : structured_type option =
+let rec get_application_type (func : structured_type) (arg : structured_type) :
+    structured_type option =
   (* Flatten the func type so only labels and intersection types remain *)
-  let func_flat = flatten_union func context1 in
+  let func_flat = flatten_union func.union func.context in
   (* The argument should be applicable to any function in the union, so acquire the type of applying the arg to each option *)
   let return_types_opt =
     List.map
       (fun func_option ->
-        get_application_option_type (func_option, context1) (arg, context2))
+        get_application_option_type (func_option, func.context) arg)
       func_flat
   in
   (* Aggregate the return types - if any of them were none, the application is not well-typed *)
-  (* Return types that come back have context1, since abstractions determine their return types *)
+  (* Return types that come back have context func.context, since abstractions determine their return types *)
   let return_types = opt_list_to_list_opt return_types_opt in
   (* Join all of the return types into a single union type, add the context *)
   Option.map
     (fun return_types_concrete ->
-      (List.flatten return_types_concrete, context2))
+      build_structured_type (List.flatten return_types_concrete) func.context)
     return_types
 
 and get_application_option_type
     ((func_option, context1) : flat_base_type * recursive_context)
-    ((arg, context2) : structured_type) : union_type option =
+    (arg : structured_type) : union_type option =
   match func_option with
   (* A label type cannot be applied *)
   | FLabel _ -> None
@@ -408,14 +438,14 @@ and get_application_option_type
   | FIntersection functions ->
       let func_params = extract_composite_args functions in
       let exhaustive_arg_coverage =
-        is_subtype (arg, context2) (func_params, context1)
+        is_subtype arg (build_structured_type func_params context1)
       in
       if not exhaustive_arg_coverage then None
       else
         Some
           (List.fold_left
              (fun acc (func_arg, func_return) ->
-               if has_intersection (arg, context2) (func_arg, context1) then
-                 acc @ func_return
+               if has_intersection arg (build_structured_type func_arg context1)
+               then acc @ func_return
                else acc)
              [] functions)

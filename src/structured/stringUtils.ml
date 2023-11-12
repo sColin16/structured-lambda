@@ -1,38 +1,48 @@
 open Type
 open Term
 
-let rec type_to_string (union_type, recursive_context : structured_type) =
+let rec type_to_string (t : structured_type) =
   Printf.sprintf "%s with %s"
-    (union_type_to_string union_type)
-    (recursive_context_to_string recursive_context)
+    (union_type_to_string t.union)
+    (recursive_context_to_string t.context)
 
-and union_type_to_string (union_type: union_type) =
+and union_type_to_string (union_type : union_type) =
   let base_type_strings = List.map base_type_to_string union_type in
   Printf.sprintf "(%s)" (String.concat "|" base_type_strings)
 
-and recursive_context_to_string (recursive_context: recursive_context) =
-  let mapping_strings = List.mapi (fun idx elt -> (Printf.sprintf "%i -> %s" idx (flat_union_type_to_string elt))) recursive_context in
+and recursive_context_to_string (recursive_context : recursive_context) =
+  let mapping_strings =
+    List.mapi
+      (fun idx elt ->
+        Printf.sprintf "%i -> %s" idx (flat_union_type_to_string elt))
+      recursive_context
+  in
   Printf.sprintf "{%s}" (String.concat "," mapping_strings)
 
-and flat_union_type_to_string (flat_union: flat_union_type) =
-  let union_type = List.map (fun flat_base ->
-    match flat_base with
-    | FLabel a -> Label a
-    | FIntersection functions -> Intersection functions
-  ) flat_union in
+and flat_union_type_to_string (flat_union : flat_union_type) =
+  let union_type =
+    List.map
+      (fun flat_base ->
+        match flat_base with
+        | FLabel a -> Label a
+        | FIntersection functions -> Intersection functions)
+      flat_union
+  in
   union_type_to_string union_type
 
 and base_type_to_string (base_type : base_type) =
   match base_type with
   | Label name -> name
-  | Intersection func_list -> Printf.sprintf "{%s}" (func_type_to_string func_list)
+  | Intersection func_list ->
+      Printf.sprintf "{%s}" (func_type_to_string func_list)
   | TypeVar n -> Printf.sprintf "R(%i)" n
 
 and func_type_to_string (func_list : unary_function list) =
   String.concat "," (List.map unary_func_type_to_string func_list)
 
 and unary_func_type_to_string ((arg, return) : unary_function) =
-  Printf.sprintf "%s->%s" (union_type_to_string arg) (union_type_to_string return)
+  Printf.sprintf "%s->%s" (union_type_to_string arg)
+    (union_type_to_string return)
 
 let rec term_to_string (term : term) =
   match term with
