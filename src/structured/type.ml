@@ -4,6 +4,21 @@ type 'a union = 'a list
 type 'a intersection = 'a list
 
 (* Coinductive recursive type definitions *)
+(**
+ We structure the types with what are essentially two union types:
+ - The recursive_context contains flat_union_types to enforce contractivity: there should be no
+    loop of recursive types, whether within other recursive types, or in unions. We should be able
+    to express any recursive type as the union of label and intersection types, where the
+    labels and intersections may leverage type variables freely
+ - The contracitivity requirement can also be expressed by enabling recursive contexts to
+    be top-level union types, and then verifying that we could transform the type into the
+    flat_union type. I prefer to require this as part of the type for simplicity at the moment,
+    I will want to operate with these flat union types internally, so might as well have the type
+    for them. I can have functions to transform to them later
+ - The top level union type can use type variables, because that will form actual types, and
+    we need to be able to reference the recursive context freely so we can express types
+    like even or odd, etc.
+*)
 type structured_type = union_type * recursive_context
 and union_type = base_type list
 
@@ -35,7 +50,7 @@ module TypeContextMap = Map.Make (struct
   let compare = compare
 end)
 
-type type_context_map = structured_type TypeContextMap.t
+type type_context_map = union_type TypeContextMap.t
 
 (* TODO: remove duplicate and subtypes from the union after flattening *)
 let extract_composite_args (branches : unary_function list) =
@@ -256,7 +271,9 @@ and is_typevar_union_subtype ((var_num, context1) : int * recursive_context)
       else encountered_type_vars
     in
     (* And recurse on both sides *)
-    is_subtype_union_rec (expanded_type_var, context1) (flat_union, context2) new_encountered_var
+    is_subtype_union_rec
+      (expanded_type_var, context1)
+      (flat_union, context2) new_encountered_var
 
 and is_function_subtype_direct
     ((functions, context1) : unary_function intersection * recursive_context)
@@ -360,28 +377,45 @@ and is_func_subtype_compatible
 (** [get_application_type func_type arg_type] determines the resulting type of
     applying a term of type [arg_type] to a term of type [func_type], if
     the function can be applied to the argument *)
-let rec get_application_type (func : structured_type) (arg : structured_type) =
+let rec get_application_type ((func, context1) : structured_type)
+    ((arg, context2) : structured_type) : structured_type option =
+  (* Flatten the func type so only labels and intersection types remain *)
+  let func_flat = flatten_union func context1 in
   (* The argument should be applicable to any function in the union, so acquire the type of applying the arg to each option *)
-  let return_types_opt = List.map (get_application_option_type arg) func in
-  (* Aggregate the return types - if anyof them were none, the application is not well-typed *)
+  let return_types_opt =
+    List.map
+      (fun func_option ->
+        get_application_option_type (func_option, context1) (arg, context2))
+      func_flat
+  in
+  (* Aggregate the return types - if any of them were none, the application is not well-typed *)
+  (* Return types that come back have context1, since abstractions determine their return types *)
   let return_types = opt_list_to_list_opt return_types_opt in
-  (* Join all of the return types into a single union types *)
-  Option.map List.flatten return_types
+  (* Join all of the return types into a single union type, add the context *)
+  Option.map
+    (fun return_types_concrete ->
+      (List.flatten return_types_concrete, context2))
+    return_types
 
-and get_application_option_type (arg : structured_type)
-    (func_option : base_type) =
+and get_application_option_type
+    ((func_option, context1) : flat_base_type * recursive_context)
+    ((arg, context2) : structured_type) : union_type option =
   match func_option with
   (* A label type cannot be applied *)
-  | Label _ -> None
+  | FLabel _ -> None
   (* An application against a function type is well-typed if the function accepts at least as many arguments.
      The return type is the union of all return types that the argument might match with *)
-  | Function func_list ->
-      let func_params = extract_composite_args func_list in
-      let exhaustive_arg_coverage = is_subtype arg func_params in
+  | FIntersection functions ->
+      let func_params = extract_composite_args functions in
+      let exhaustive_arg_coverage =
+        is_subtype (arg, context2) (func_params, context1)
+      in
       if not exhaustive_arg_coverage then None
       else
         Some
           (List.fold_left
              (fun acc (func_arg, func_return) ->
-               if has_intersection arg func_arg then acc @ func_return else acc)
-             [] func_list)
+               if has_intersection (arg, context2) (func_arg, context1) then
+                 acc @ func_return
+               else acc)
+             [] functions)

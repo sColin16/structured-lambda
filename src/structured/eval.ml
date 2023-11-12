@@ -1,6 +1,5 @@
 open Term
 open Type
-open Helpers
 
 (** [eval term] evaluates a term to a value *)
 let rec eval (term : term) =
@@ -92,14 +91,3 @@ and shift_rec (term : term) (shift_amt : int) (cutoff : int) =
       Application (shift_rec t1 shift_amt cutoff, shift_rec t2 shift_amt cutoff)
   | Const _ -> term
   | Fix inner_term -> Fix (shift_rec inner_term shift_amt cutoff)
-
-and intersect_terms (terms : term intersection) =
-  let abstraction_bodies_opt =
-    List.map
-      (fun term ->
-        match term with Abstraction branches -> Some branches | _ -> None)
-      terms
-  in
-  let abstraction_bodies = opt_list_to_list_opt abstraction_bodies_opt in
-  let unified_abstraction_bodies = Option.map List.flatten abstraction_bodies in
-  Option.map (fun x -> Abstraction x) unified_abstraction_bodies
