@@ -1,123 +1,122 @@
 open Structured
+open StructuredHelpers
 
-let get_type_unsafe term = Option.get (get_type term)
-let zero_type = Label "Zero"
-let one_type = Label "One"
-let two_type = Label "Two"
-let three_type = Label "Three"
-let four_type = Label "Four"
-let five_type = Label "Five"
-let six_type = Label "Six"
-let seven_type = Label "Seven"
+let zero = get_typed_term_unsafe (Const "Zero")
+let one = get_typed_term_unsafe (Const "One")
+let two = get_typed_term_unsafe (Const "Two")
+let three = get_typed_term_unsafe (Const "Three")
+let four = get_typed_term_unsafe (Const "Four")
+let five = get_typed_term_unsafe (Const "Five")
+let six = get_typed_term_unsafe (Const "Six")
+let seven = get_typed_term_unsafe (Const "Seven")
 
-let three_bit_num =
-  [
-    zero_type;
-    one_type;
-    two_type;
-    three_type;
-    four_type;
-    five_type;
-    six_type;
-    seven_type;
-  ]
+let three_bit_type =
+  get_type_union
+    [
+      zero.stype;
+      one.stype;
+      two.stype;
+      three.stype;
+      four.stype;
+      five.stype;
+      six.stype;
+      seven.stype;
+    ]
 
-let unary_num_op = Function [ (three_bit_num, three_bit_num) ]
-let binary_num_op = Function [ (three_bit_num, [ unary_num_op ]) ]
-let zero_term = Const "Zero"
-let one_term = Const "One"
-let two_term = Const "Two"
-let three_term = Const "Three"
-let four_term = Const "Four"
-let five_term = Const "Five"
-let six_term = Const "Six"
-let seven_term = Const "Seven"
+let unary_num_op =
+  func_to_structured_type (three_bit_type.union, three_bit_type.union)
+
+let binary_num_op =
+  func_to_structured_type (three_bit_type.union, unary_num_op.union)
 
 let increment =
-  Abstraction
-    [
-      ([ zero_type ], one_term);
-      ([ one_type ], two_term);
-      ([ two_type ], three_term);
-      ([ three_type ], four_term);
-      ([ four_type ], five_term);
-      ([ five_type ], six_term);
-      ([ six_type ], seven_term);
-      ([ seven_type ], zero_term);
-    ]
-
-let increment_type = get_type_unsafe increment
+  get_typed_term_unsafe
+    (Abstraction
+       [
+         (zero.stype, one.term);
+         (one.stype, two.term);
+         (two.stype, three.term);
+         (three.stype, four.term);
+         (four.stype, five.term);
+         (five.stype, six.term);
+         (six.stype, seven.term);
+         (seven.stype, zero.term);
+       ])
 
 let decrement =
-  Abstraction
-    [
-      ([ zero_type ], seven_term);
-      ([ one_type ], zero_term);
-      ([ two_type ], one_term);
-      ([ three_type ], two_term);
-      ([ four_type ], three_term);
-      ([ five_type ], four_term);
-      ([ six_type ], five_term);
-      ([ seven_type ], six_term);
-    ]
-
-let decrement_type = get_type_unsafe decrement
+  get_typed_term_unsafe
+    (Abstraction
+       [
+         (zero.stype, seven.term);
+         (one.stype, zero.term);
+         (two.stype, one.term);
+         (three.stype, two.term);
+         (four.stype, three.term);
+         (five.stype, four.term);
+         (six.stype, five.term);
+         (seven.stype, six.term);
+       ])
 
 let add =
-  Fix
-    (Abstraction
-       [
-         ( [ binary_num_op ],
-           Abstraction
-             [
-               ([ zero_type ], Abstraction [ (three_bit_num, Variable 0) ]);
-               ( [
-                   one_type;
-                   two_type;
-                   three_type;
-                   four_type;
-                   five_type;
-                   six_type;
-                   seven_type;
-                 ],
-                 Abstraction
-                   [
-                     ( three_bit_num,
-                       Application
-                         ( Application
-                             (Variable 2, Application (decrement, Variable 1)),
-                           Application (increment, Variable 0) ) );
-                   ] );
-             ] );
-       ])
-
-let add_type = get_type_unsafe add
+  get_typed_term_unsafe
+    (Fix
+       (Abstraction
+          [
+            ( binary_num_op,
+              Abstraction
+                [
+                  (zero.stype, Abstraction [ (three_bit_type, Variable 0) ]);
+                  ( get_type_union
+                      [
+                        one.stype;
+                        two.stype;
+                        three.stype;
+                        four.stype;
+                        five.stype;
+                        six.stype;
+                        seven.stype;
+                      ],
+                    Abstraction
+                      [
+                        ( three_bit_type,
+                          Application
+                            ( Application
+                                ( Variable 2,
+                                  Application (decrement.term, Variable 1) ),
+                              Application (increment.term, Variable 0) ) );
+                      ] );
+                ] );
+          ]))
 
 let fib =
-  Fix
-    (Abstraction
-       [
-         ( [ unary_num_op ],
-           Abstraction
-             [
-               ([ zero_type; one_type ], one_term);
-               ( [
-                   two_type;
-                   three_type;
-                   four_type;
-                   five_type;
-                   six_type;
-                   seven_type;
-                 ],
-                 Application
-                   ( Application
-                       ( add,
-                         Application
-                           (Variable 1, Application (decrement, Variable 0)) ),
-                     Application
-                       ( Variable 1,
-                         Application
-                           (decrement, Application (decrement, Variable 0)) ) )
-               );
-             ] );
-       ])
+  get_typed_term_unsafe
+    (Fix
+       (Abstraction
+          [
+            ( unary_num_op,
+              Abstraction
+                [
+                  (get_type_union [ zero.stype; one.stype ], one.term);
+                  ( get_type_union
+                      [
+                        two.stype;
+                        three.stype;
+                        four.stype;
+                        five.stype;
+                        six.stype;
+                        seven.stype;
+                      ],
+                    Application
+                      ( Application
+                          ( add.term,
+                            Application
+                              ( Variable 1,
+                                Application (decrement.term, Variable 0) ) ),
+                        Application
+                          ( Variable 1,
+                            Application
+                              ( decrement.term,
+                                Application (decrement.term, Variable 0) ) ) )
+                  );
+                ] );
+          ]))

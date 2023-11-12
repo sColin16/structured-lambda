@@ -1,112 +1,144 @@
 open Structured
+open StructuredHelpers
 open StructuredBool
 
 let split_unary_bool =
-  Function [ ([ true_type ], bool_type); ([ false_type ], bool_type) ]
+  base_to_structured_type
+    (Intersection
+       [
+         (true_lambda.stype.union, bool_type.union);
+         (false_lambda.stype.union, bool_type.union);
+       ])
 
 let split_identity_type =
-  Function [ ([ true_type ], [ true_type ]); ([ false_type ], [ false_type ]) ]
+  base_to_structured_type
+    (Intersection
+       [
+         (true_lambda.stype.union, true_lambda.stype.union);
+         (false_lambda.stype.union, false_lambda.stype.union);
+       ])
 
 let split_not_type =
-  Function [ ([ true_type ], [ false_type ]); ([ false_type ], [ true_type ]) ]
+  base_to_structured_type
+    (Intersection
+       [
+         (true_lambda.stype.union, false_lambda.stype.union);
+         (false_lambda.stype.union, true_lambda.stype.union);
+       ])
 
 let split_unary_true_type =
-  Function [ ([ true_type ], [ true_type ]); ([ false_type ], [ true_type ]) ]
+  base_to_structured_type
+    (Intersection
+       [
+         (true_lambda.stype.union, true_lambda.stype.union);
+         (false_lambda.stype.union, true_lambda.stype.union);
+       ])
 
 let split_unary_false_type =
-  Function [ ([ true_type ], [ false_type ]); ([ false_type ], [ false_type ]) ]
+  base_to_structured_type
+    (Intersection
+       [
+         (true_lambda.stype.union, false_lambda.stype.union);
+         (false_lambda.stype.union, false_lambda.stype.union);
+       ])
 
-let unary_true_type = Function [ (bool_type, [ true_type ]) ]
-let unary_false_type = Function [ (bool_type, [ false_type ]) ]
-let name_term, name_type = get_typed_term_unsafe (Const "Name")
-let val_term, val_type = get_typed_term_unsafe (Const "Val")
-let zero_label_term, zero_label_type = get_typed_term_unsafe (Const "Zero")
-let succ_term, succ_type = get_typed_term_unsafe (Const "Succ")
+let unary_true_type =
+  func_to_structured_type (bool_type.union, true_lambda.stype.union)
+
+let unary_false_type =
+  func_to_structured_type (bool_type.union, false_lambda.stype.union)
+
+let name = get_typed_term_unsafe (Const "Name")
+let val_lambda = get_typed_term_unsafe (Const "Val")
+let zero_label = get_typed_term_unsafe (Const "Zero")
+let succ = get_typed_term_unsafe (Const "Succ")
 
 let increment_term term =
-  Abstraction [ (name_type, succ_term); (val_type, term) ]
+  Abstraction [ (name.stype, succ.term); (val_lambda.stype, term) ]
 
-let zero_term, zero_type =
-  get_typed_term_unsafe (Abstraction [ (name_type, zero_label_term) ])
-
-let one_term, one_type = get_typed_term_unsafe (increment_term zero_term)
-let two_term, two_type = get_typed_term_unsafe (increment_term one_term)
-let three_term, three_type = get_typed_term_unsafe (increment_term two_term)
-let four_term, four_type = get_typed_term_unsafe (increment_term three_term)
-let five_term, five_type = get_typed_term_unsafe (increment_term four_term)
-let six_term, six_type = get_typed_term_unsafe (increment_term five_term)
-let seven_term, seven_type = get_typed_term_unsafe (increment_term six_term)
+let zero = get_typed_term_unsafe (Abstraction [ (name.stype, zero_label.term) ])
+let one = get_typed_term_unsafe (increment_term zero.term)
+let two = get_typed_term_unsafe (increment_term one.term)
+let three = get_typed_term_unsafe (increment_term two.term)
+let four = get_typed_term_unsafe (increment_term three.term)
+let five = get_typed_term_unsafe (increment_term four.term)
+let six = get_typed_term_unsafe (increment_term five.term)
+let seven = get_typed_term_unsafe (increment_term six.term)
 
 let three_bit_num =
-  List.flatten
+  get_type_union
     [
-      zero_type;
-      one_type;
-      two_type;
-      three_type;
-      four_type;
-      five_type;
-      six_type;
-      seven_type;
+      zero.stype;
+      one.stype;
+      two.stype;
+      three.stype;
+      four.stype;
+      five.stype;
+      six.stype;
+      seven.stype;
     ]
 
-let unary_num_type = Function [ (three_bit_num, three_bit_num) ]
-let binary_num_type = Function [ (three_bit_num, [ unary_num_type ]) ]
+let unary_num_type =
+  func_to_structured_type (three_bit_num.union, three_bit_num.union)
 
-let increment_three_bit, increment_three_bit_type =
+let binary_num_type =
+  func_to_structured_type (three_bit_num.union, unary_num_type.union)
+
+let increment_three_bit =
   get_typed_term_unsafe
     (Abstraction
        [
-         ( List.flatten
+         ( get_type_union
              [
-               zero_type;
-               one_type;
-               two_type;
-               three_type;
-               four_type;
-               five_type;
-               six_type;
+               zero.stype;
+               one.stype;
+               two.stype;
+               three.stype;
+               four.stype;
+               five.stype;
+               six.stype;
              ],
-           Abstraction [ (name_type, Const "Succ"); (val_type, Variable 1) ] );
-         (seven_type, zero_term);
+           Abstraction
+             [ (name.stype, Const "Succ"); (val_lambda.stype, Variable 1) ] );
+         (seven.stype, zero.term);
        ])
 
-let decrement_three_bit, decrement_three_bit_type =
+let decrement_three_bit =
   get_typed_term_unsafe
     (Abstraction
        [
-         ( List.flatten
+         ( get_type_union
              [
-               one_type;
-               two_type;
-               three_type;
-               four_type;
-               five_type;
-               six_type;
-               seven_type;
+               one.stype;
+               two.stype;
+               three.stype;
+               four.stype;
+               five.stype;
+               six.stype;
+               seven.stype;
              ],
-           Application (Variable 0, val_term) );
-         (zero_type, seven_term);
+           Application (Variable 0, val_lambda.term) );
+         (zero.stype, seven.term);
        ])
 
-let add_three_bit, add_three_bit_type =
+let add_three_bit =
   get_typed_term_unsafe
     (Fix
        (Abstraction
           [
-            ( [ binary_num_type ],
+            ( binary_num_type,
               Abstraction
                 [
-                  (zero_type, Abstraction [ (three_bit_num, Variable 0) ]);
-                  ( List.flatten
+                  (zero.stype, Abstraction [ (three_bit_num, Variable 0) ]);
+                  ( get_type_union
                       [
-                        one_type;
-                        two_type;
-                        three_type;
-                        four_type;
-                        five_type;
-                        six_type;
-                        seven_type;
+                        one.stype;
+                        two.stype;
+                        three.stype;
+                        four.stype;
+                        five.stype;
+                        six.stype;
+                        seven.stype;
                       ],
                     Abstraction
                       [
@@ -114,66 +146,68 @@ let add_three_bit, add_three_bit_type =
                           Application
                             ( Application
                                 ( Variable 2,
-                                  Application (decrement_three_bit, Variable 1)
-                                ),
-                              Application (increment_three_bit, Variable 0) ) );
+                                  Application
+                                    (decrement_three_bit.term, Variable 1) ),
+                              Application (increment_three_bit.term, Variable 0)
+                            ) );
                       ] );
                 ] );
           ]))
 
 let increment_three_bit_type_expected =
-  Function
-    [
-      ( List.flatten
-          [
-            zero_type;
-            one_type;
-            two_type;
-            three_type;
-            four_type;
-            five_type;
-            six_type;
-          ],
-        List.flatten
-          [
-            one_type;
-            two_type;
-            three_type;
-            four_type;
-            five_type;
-            six_type;
-            seven_type;
-          ] );
-      (seven_type, zero_type);
-    ]
+  base_to_structured_type
+    (Intersection
+       [
+         ( (get_type_union
+              [
+                zero.stype;
+                one.stype;
+                two.stype;
+                three.stype;
+                four.stype;
+                five.stype;
+                six.stype;
+              ])
+             .union,
+           (get_type_union
+              [
+                one.stype;
+                two.stype;
+                three.stype;
+                four.stype;
+                five.stype;
+                six.stype;
+                seven.stype;
+              ])
+             .union );
+         (seven.stype.union, zero.stype.union);
+       ])
 
 let decrement_three_bit_type_expected =
-  Function
-    [
-      ( List.flatten
-          [
-            one_type;
-            two_type;
-            three_type;
-            four_type;
-            five_type;
-            six_type;
-            seven_type;
-          ],
-        List.flatten
-          [
-            zero_type;
-            one_type;
-            two_type;
-            three_type;
-            four_type;
-            five_type;
-            six_type;
-          ] );
-      (zero_type, seven_type);
-    ]
-
-(*
-  Types to test:
-  three bit numbers, increment, decrement, addition and other wrap-around functions on this finite type
-*)
+  base_to_structured_type
+    (Intersection
+       [
+         ( (get_type_union
+              [
+                one.stype;
+                two.stype;
+                three.stype;
+                four.stype;
+                five.stype;
+                six.stype;
+                seven.stype;
+              ])
+             .union,
+           (get_type_union
+              [
+                zero.stype;
+                one.stype;
+                two.stype;
+                three.stype;
+                four.stype;
+                five.stype;
+                six.stype;
+              ])
+             .union );
+         (zero.stype.union, seven.stype.union);
+       ])

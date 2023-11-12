@@ -1,49 +1,52 @@
 open Structured
+open StructuredHelpers
 
-let get_type_unsafe term = Option.get (get_type term)
-let get_typed_term_unsafe term = (term, get_type_unsafe term)
+let true_lambda = get_typed_term_unsafe (Const "True")
+let false_lambda = get_typed_term_unsafe (Const "False")
+let bool_type = get_type_union [ true_lambda.stype; false_lambda.stype ]
+let unary_bool_op = func_to_structured_type (bool_type.union, bool_type.union)
 
-let true_type = Label "True"
-let false_type = Label "False"
-let bool_type = [ true_type; false_type ]
-let unary_bool_op = Function [ (bool_type, bool_type) ]
-let binary_bool_op = Function [ (bool_type, [ unary_bool_op ]) ]
-let ternary_bool_op = Function [ (bool_type, [ binary_bool_op ]) ]
-let true_term = Const "True"
-let false_term = Const "False"
-let identity = Abstraction [ (bool_type, Variable 0) ]
-let identity_type = get_type_unsafe identity
+let binary_bool_op =
+  func_to_structured_type (bool_type.union, unary_bool_op.union)
 
-let not_term =
-  Abstraction [ ([ true_type ], false_term); ([ false_type ], true_term) ]
+let ternary_bool_op =
+  func_to_structured_type (bool_type.union, binary_bool_op.union)
 
-let not_type = get_type_unsafe not_term
+let identity_lambda =
+  get_typed_term_unsafe (Abstraction [ (bool_type, Variable 0) ])
 
-let and_term =
-  Abstraction
-    [
-      ([ true_type ], identity);
-      ([ false_type ], Abstraction [ (bool_type, false_term) ]);
-    ]
+let not_lambda =
+  get_typed_term_unsafe
+    (Abstraction
+       [
+         (true_lambda.stype, false_lambda.term);
+         (false_lambda.stype, true_lambda.term);
+       ])
 
-let and_type = get_type_unsafe and_term
+let and_lambda =
+  get_typed_term_unsafe
+    (Abstraction
+       [
+         (true_lambda.stype, identity_lambda.term);
+         (false_lambda.stype, Abstraction [ (bool_type, false_lambda.term) ]);
+       ])
 
-let or_term =
-  Abstraction
-    [
-      ([ true_type ], Abstraction [ (bool_type, true_term) ]);
-      ([ false_type ], identity);
-    ]
+let or_lambda =
+  get_typed_term_unsafe
+    (Abstraction
+       [
+         (true_lambda.stype, Abstraction [ (bool_type, true_lambda.term) ]);
+         (false_lambda.stype, identity_lambda.term);
+       ])
 
-let or_type = get_type_unsafe or_term
-
-let if_term =
-  Abstraction
-    [
-      ( [ true_type ],
-        Abstraction [ (bool_type, Abstraction [ (bool_type, Variable 1) ]) ] );
-      ( [ false_type ],
-        Abstraction [ (bool_type, Abstraction [ (bool_type, Variable 0) ]) ] );
-    ]
-
-let if_type = get_type_unsafe if_term
+let if_lambda =
+  get_typed_term_unsafe
+    (Abstraction
+       [
+         ( true_lambda.stype,
+           Abstraction [ (bool_type, Abstraction [ (bool_type, Variable 1) ]) ]
+         );
+         ( false_lambda.stype,
+           Abstraction [ (bool_type, Abstraction [ (bool_type, Variable 0) ]) ]
+         );
+       ])

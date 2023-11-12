@@ -1,83 +1,85 @@
 open Structured
+open StructuredHelpers
 open StructuredArithmetic
 open StructuredBool
 
-let evaluates_to term value = eval term = value
-let is_even_label_type = Label "isEven"
-let is_odd_label_type = Label "isOdd"
-let is_even_label_term = Const "isEven"
-let is_odd_label_term = Const "isOdd"
-let name_type = Label "Name"
-let name_term = Const "Name"
-let num_to_bool = Function [ (three_bit_num, bool_type) ]
+let is_even_label = get_typed_term_unsafe (Const "isEven")
+let is_odd_label = get_typed_term_unsafe (Const "isOdd")
+
+let is_even_odd_label =
+  get_type_union [ is_even_label.stype; is_odd_label.stype ]
+
+let name = get_typed_term_unsafe (Const "Name")
+let num_to_bool = func_to_structured_type (three_bit_type.union, bool_type.union)
 
 let is_zero =
-  Abstraction
-    [
-      ([ zero_type ], true_term);
-      ( [
-          one_type;
-          two_type;
-          three_type;
-          four_type;
-          five_type;
-          six_type;
-          seven_type;
-        ],
-        false_term );
-    ]
-
-let is_zero_type = get_type_unsafe is_zero
-
-let is_even_odd =
-  Fix
+  get_typed_term_unsafe
     (Abstraction
        [
-         ( [
-             Function
-               [ ([ is_even_label_type; is_odd_label_type ], [ num_to_bool ]) ];
-           ],
-           Abstraction
+         (zero.stype, true_lambda.term);
+         ( get_type_union
              [
-               ( [ is_even_label_type ],
-                 Abstraction
-                   [
-                     ([ zero_type ], true_term);
-                     ( [
-                         one_type;
-                         two_type;
-                         three_type;
-                         four_type;
-                         five_type;
-                         six_type;
-                         seven_type;
-                       ],
-                       Application
-                         ( Application (Variable 2, is_odd_label_term),
-                           Application (decrement, Variable 0) ) );
-                   ] );
-               ( [ is_odd_label_type ],
-                 Abstraction
-                   [
-                     ([ zero_type ], false_term);
-                     ( [
-                         one_type;
-                         two_type;
-                         three_type;
-                         four_type;
-                         five_type;
-                         six_type;
-                         seven_type;
-                       ],
-                       Application
-                         ( Application (Variable 2, is_even_label_term),
-                           Application (decrement, Variable 0) ) );
-                   ] );
-             ] );
+               one.stype;
+               two.stype;
+               three.stype;
+               four.stype;
+               five.stype;
+               six.stype;
+               seven.stype;
+             ],
+           false_lambda.term );
        ])
 
-let is_even_odd_type = get_type_unsafe is_even_odd
-let is_even = Application (is_even_odd, is_even_label_term)
-let is_even_type = get_type_unsafe is_even
-let is_odd = Application (is_even_odd, is_odd_label_term)
-let is_odd_type = get_type_unsafe is_odd
+let is_even_odd =
+  get_typed_term_unsafe
+    (Fix
+       (Abstraction
+          [
+            ( func_to_structured_type
+                (is_even_odd_label.union, num_to_bool.union),
+              Abstraction
+                [
+                  ( is_even_label.stype,
+                    Abstraction
+                      [
+                        (zero.stype, true_lambda.term);
+                        ( get_type_union
+                            [
+                              one.stype;
+                              two.stype;
+                              three.stype;
+                              four.stype;
+                              five.stype;
+                              six.stype;
+                              seven.stype;
+                            ],
+                          Application
+                            ( Application (Variable 2, is_odd_label.term),
+                              Application (decrement.term, Variable 0) ) );
+                      ] );
+                  ( is_odd_label.stype,
+                    Abstraction
+                      [
+                        (zero.stype, false_lambda.term);
+                        ( get_type_union
+                            [
+                              one.stype;
+                              two.stype;
+                              three.stype;
+                              four.stype;
+                              five.stype;
+                              six.stype;
+                              seven.stype;
+                            ],
+                          Application
+                            ( Application (Variable 2, is_even_label.term),
+                              Application (decrement.term, Variable 0) ) );
+                      ] );
+                ] );
+          ]))
+
+let is_even =
+  get_typed_term_unsafe (Application (is_even_odd.term, is_even_label.term))
+
+let is_odd =
+  get_typed_term_unsafe (Application (is_even_odd.term, is_odd_label.term))
