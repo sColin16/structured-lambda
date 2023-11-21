@@ -3,5 +3,5 @@ module StructuredArithmetic = StructuredArithmetic
 module StructuredBool = StructuredBool
 module StructuredMixed = StructuredMixed
 module StructuredUnions = StructuredUnions
-module StructuredCoinductive = StructuredCoinductive
+module StructuredRecursive = StructuredRecursive
 module StructuredHelpers = StructuredHelpers
