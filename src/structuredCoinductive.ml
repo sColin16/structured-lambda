@@ -58,11 +58,19 @@ let neg_two = generate_typed_num (-2)
 
 let positive_number =
   build_structured_type [ TypeVar 0 ]
-    [ get_flat_union_type [ one.stype; generate_succ_rec_step 1 ] ]
+    (build_recursive_context
+       [
+         ( Coinductive,
+           get_flat_union_type [ one.stype; generate_succ_rec_step 1 ] );
+       ])
 
 let negative_number =
   build_structured_type [ TypeVar 0 ]
-    [ get_flat_union_type [ neg_one.stype; generate_pred_rec_step 1 ] ]
+    (build_recursive_context
+       [
+         ( Coinductive,
+           get_flat_union_type [ neg_one.stype; generate_pred_rec_step 1 ] );
+       ])
 
 let natural_number = get_type_union [ zero.stype; positive_number ]
 let non_negative_number = get_type_union [ zero.stype; negative_number ]
@@ -70,19 +78,35 @@ let integer = get_type_union [ negative_number; zero.stype; positive_number ]
 
 let pos_even_number =
   build_structured_type [ TypeVar 0 ]
-    [ get_flat_union_type [ two.stype; generate_succ_rec_step 2 ] ]
+    (build_recursive_context
+       [
+         ( Coinductive,
+           get_flat_union_type [ two.stype; generate_succ_rec_step 2 ] );
+       ])
 
 let neg_even_number =
   build_structured_type [ TypeVar 0 ]
-    [ get_flat_union_type [ neg_two.stype; generate_pred_rec_step 2 ] ]
+    (build_recursive_context
+       [
+         ( Coinductive,
+           get_flat_union_type [ neg_two.stype; generate_pred_rec_step 2 ] );
+       ])
 
 let pos_odd_number =
   build_structured_type [ TypeVar 0 ]
-    [ get_flat_union_type [ one.stype; generate_succ_rec_step 2 ] ]
+    (build_recursive_context
+       [
+         ( Coinductive,
+           get_flat_union_type [ one.stype; generate_succ_rec_step 2 ] );
+       ])
 
 let neg_odd_number =
   build_structured_type [ TypeVar 0 ]
-    [ get_flat_union_type [ neg_one.stype; generate_pred_rec_step 2 ] ]
+    (build_recursive_context
+       [
+         ( Coinductive,
+           get_flat_union_type [ neg_one.stype; generate_pred_rec_step 2 ] );
+       ])
 
 let even_integer =
   get_type_union [ neg_even_number; zero.stype; pos_even_number ]
@@ -91,10 +115,12 @@ let odd_integer = get_type_union [ neg_odd_number; pos_odd_number ]
 
 let pos_infinity =
   build_structured_type [ TypeVar 0 ]
-    [ get_flat_union_type [ generate_succ_rec_step 1 ] ]
+    (build_recursive_context
+       [ (Coinductive, get_flat_union_type [ generate_succ_rec_step 1 ]) ])
 
 let neg_infinity =
   build_structured_type [ TypeVar 0 ]
-    [ get_flat_union_type [ generate_pred_rec_step 1 ] ]
+    (build_recursive_context
+       [ (Coinductive, get_flat_union_type [ generate_pred_rec_step 1 ]) ])
 
 let infinity = get_type_union [ pos_infinity; neg_infinity ]

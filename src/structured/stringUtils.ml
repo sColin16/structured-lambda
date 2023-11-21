@@ -12,12 +12,14 @@ and union_type_to_string (union_type : union_type) =
 
 and recursive_context_to_string (recursive_context : recursive_context) =
   let mapping_strings =
-    List.mapi
-      (fun idx elt ->
-        Printf.sprintf "%i -> %s" idx (flat_union_type_to_string elt))
-      recursive_context
+    List.mapi (fun idx def -> recursive_def_to_string idx def) recursive_context
   in
   Printf.sprintf "{%s}" (String.concat "," mapping_strings)
+
+and recursive_def_to_string (num : int) (def : recursive_def) =
+  if def.kind = Coinductive then
+    Printf.sprintf "Coind:%i->%s" num (flat_union_type_to_string def.flat_union)
+  else Printf.sprintf "Ind:%i->%s" num (flat_union_type_to_string def.flat_union)
 
 and flat_union_type_to_string (flat_union : flat_union_type) =
   let union_type =

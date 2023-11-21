@@ -3,23 +3,6 @@ open Helpers
 type 'a union = 'a list
 type 'a intersection = 'a list
 
-(* Coinductive recursive type definitions *)
-(**
- We structure the types with what are essentially two union types:
- - The recursive_context contains flat_union_types to enforce contractivity: there should be no
-    loop of recursive types, whether within other recursive types, or in unions. We should be able
-    to express any recursive type as the union of label and intersection types, where the
-    labels and intersections may leverage type variables freely
- - The contracitivity requirement can also be expressed by enabling recursive contexts to
-    be top-level union types, and then verifying that we could transform the type into the
-    flat_union type. I prefer to require this as part of the type for simplicity at the moment,
-    I will want to operate with these flat union types internally, so might as well have the type
-    for them. I can have functions to transform to them later
- - The top level union type can use type variables, because that will form actual types, and
-    we need to be able to reference the recursive context freely so we can express types
-    like even or odd, etc.
-*)
-
 type structured_type = { union : union_type; context : recursive_context }
 and union_type = base_type list
 
@@ -29,9 +12,11 @@ and base_type =
   | TypeVar of int
 
 and unary_function = union_type * union_type
-and recursive_context = flat_union_type list
+and recursive_context = recursive_def list
 and flat_union_type = flat_base_type list
 and flat_base_type = FLabel of string | FIntersection of unary_function list
+and recursive_def = { kind : recursive_kind; flat_union : flat_union_type }
+and recursive_kind = Inductive | Coinductive
 
 module TypeVarPairSet = Set.Make (struct
   type t = int * int
@@ -53,8 +38,20 @@ end)
 
 type type_context_map = union_type TypeContextMap.t
 
+(* Represents an expression that must have an inductive base case for the expression to be true *)
+type base_case_conjunction = TypeVarLoop.t
+type base_case_disjunction = base_case_conjunction list
+type base_case_expr = False | True of base_case_disjunction
+
 let build_structured_type (union : union_type) (context : recursive_context) =
   { union; context }
+
+let build_recursive_def (kind : recursive_kind) (flat_union : flat_union_type): recursive_def
+    =
+  { kind; flat_union }
+
+let build_recursive_context (defs: (recursive_kind * flat_union_type) list): recursive_context =
+  List.map (fun (kind, union) -> build_recursive_def kind union) defs
 
 (* TODO: remove duplicate and subtypes from the union after flattening *)
 let extract_composite_args (branches : unary_function list) =
@@ -72,7 +69,7 @@ let flatten_union (union : union_type) (context : recursive_context) :
          match base_type with
          | Label a -> [ FLabel a ]
          | Intersection a -> [ FIntersection a ]
-         | TypeVar n -> List.nth context n)
+         | TypeVar n -> (List.nth context n).flat_union)
        union)
 
 (* TODO: consider just accepted a structured type here *)
@@ -90,7 +87,7 @@ let flatten_union_contractive (union : union_type) (context : recursive_context)
   build_structured_type converted_union context
 
 let expand_type_var_contractive (var_num : int) (context : recursive_context) =
-  let flat_union = List.nth context var_num in
+  let flat_union = (List.nth context var_num).flat_union in
   let converted_union =
     List.map
       (fun base_type ->
@@ -205,6 +202,8 @@ let rec is_unary (t : structured_type) =
 let rec is_subtype (t1 : structured_type) (t2 : structured_type) =
   is_subtype_union_rec t1 t2 TypeVarLoop.empty
 
+(* This would return a list of all the base union types it encounters instead, so caller can process *)
+(* We might have a helper that can return a unified result, for callers that don't need to process individual elements *)
 and is_subtype_union_rec (t1 : structured_type) (t2 : structured_type)
     (encountered_type_vars : TypeVarLoop.t) =
   (* A union type is a subtype of another union type, if each base type in the first union is a subtype
@@ -222,6 +221,7 @@ and is_base_union_subtype ((t1, c1) : base_type * recursive_context)
       is_function_union_subtype (functions, c1) t2 encountered_type_vars
   | TypeVar n -> is_typevar_union_subtype (n, c1) t2 encountered_type_vars
 
+(* Should always be able to return a definitive true/false *)
 and is_label_union_subtype (label : string) (t : structured_type) =
   let flat_union = flatten_union t.union t.context in
   (* A label is a subtype of an equivalent label in the union, or the top type *)
@@ -233,6 +233,7 @@ and is_label_union_subtype (label : string) (t : structured_type) =
       | FIntersection (_ :: _) -> false)
     flat_union
 
+(* Must return a union of the compound structure *)
 and is_function_union_subtype
     ((functions, context1) : unary_function intersection * recursive_context)
     (t : structured_type) (encountered_type_vars : TypeVarLoop.t) =
@@ -263,6 +264,7 @@ and is_function_union_subtype
     in
     is_indirect_subtype
 
+(* Must return the compound structure, be able to create it as a base case, and introspect return of recursive case to determine outcome of loops *)
 and is_typevar_union_subtype ((var_num, context1) : int * recursive_context)
     (t : structured_type) (encountered_type_vars : TypeVarLoop.t) =
   let union_contains_typevars =
@@ -292,6 +294,7 @@ and is_typevar_union_subtype ((var_num, context1) : int * recursive_context)
     (* And recurse on both sides *)
     is_subtype_union_rec expanded_type_var flat_union new_encountered_var
 
+(* Returns the compound structure. Must be able to union the compound structure *)
 and is_function_subtype_direct
     ((functions, context1) : unary_function intersection * recursive_context)
     ((union_of_intersections, context2) :
@@ -305,6 +308,7 @@ and is_function_subtype_direct
         encountered_type_vars)
     union_of_intersections
 
+(* Must return an intersection of the compound structure *)
 and is_function_subtype_indirect
     ((functions, context1) : unary_function intersection * recursive_context)
     ((union_of_intersections, context2) :
@@ -334,6 +338,7 @@ and is_function_subtype_indirect
       in
       does_subtype
 
+(* Must return the compound structure. Must intersect multiple compound structures *)
 and is_intersection_subtype
     ((functions1, context1) : unary_function intersection * recursive_context)
     ((functions2, context2) : unary_function intersection * recursive_context)
@@ -358,6 +363,7 @@ and is_intersection_subtype
   in
   exhaustive_arg_coverage && return_type_constraint
 
+(* Must return a union of the compound structure *)
 and is_intersection_union_subtype
     ((unary_form_functions, context1) :
       unary_function intersection * recursive_context)
@@ -383,6 +389,7 @@ and is_intersection_union_subtype
         encountered_type_vars)
     unary_form_functions
 
+(* Will need to return whatever compound expression we need. Sometimes may be true directly *)
 and is_func_subtype_compatible
     (((arg1, return1), context1) : unary_function * recursive_context)
     (((arg2, return2), context2) : unary_function * recursive_context)
