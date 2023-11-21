@@ -46,11 +46,12 @@ type base_case_expr = False | True of base_case_disjunction
 let build_structured_type (union : union_type) (context : recursive_context) =
   { union; context }
 
-let build_recursive_def (kind : recursive_kind) (flat_union : flat_union_type): recursive_def
-    =
+let build_recursive_def (kind : recursive_kind) (flat_union : flat_union_type) :
+    recursive_def =
   { kind; flat_union }
 
-let build_recursive_context (defs: (recursive_kind * flat_union_type) list): recursive_context =
+let build_recursive_context (defs : (recursive_kind * flat_union_type) list) :
+    recursive_context =
   List.map (fun (kind, union) -> build_recursive_def kind union) defs
 
 (* TODO: remove duplicate and subtypes from the union after flattening *)
@@ -143,10 +144,10 @@ and has_intersection_base_rec ((t1, c1) : base_type * recursive_context)
         encountered_type_vars
   (* Finally, handle the potential loop case *)
   | TypeVar n, TypeVar m ->
-      (* If we encounter a loop, we assume an intersection exists due to
-         coinductive typing. This will be false for inductive types, which require a
-         well-founded intersection *)
-      if TypeVarPairSet.mem (n, m) encountered_type_vars then true
+      (* If we encounter a loop, intersection exists between two coinductive, but not
+         if inductive types are involved at all, since they require a well-founded intersection *)
+      if TypeVarPairSet.mem (n, m) encountered_type_vars then
+        ((List.nth c1 n).kind = Coinductive) && ((List.nth c2 m).kind = Coinductive)
       else
         (* If we don't encounter a loop, we expand both sides and recurse, tracking this pair to detect a future loop *)
         has_intersection_rec
