@@ -64,6 +64,13 @@ let coi_positive_number =
            get_flat_union_type [ one.stype; generate_succ_rec_step 1 ] );
        ])
 
+let ind_positive_number =
+  build_structured_type [ TypeVar 0 ]
+    (build_recursive_context
+       [
+         (Inductive, get_flat_union_type [ one.stype; generate_succ_rec_step 1 ]);
+       ])
+
 let coi_negative_number =
   build_structured_type [ TypeVar 0 ]
     (build_recursive_context
@@ -72,9 +79,32 @@ let coi_negative_number =
            get_flat_union_type [ neg_one.stype; generate_pred_rec_step 1 ] );
        ])
 
+let ind_negative_number =
+  build_structured_type [ TypeVar 0 ]
+    (build_recursive_context
+       [
+         ( Inductive,
+           get_flat_union_type [ neg_one.stype; generate_pred_rec_step 1 ] );
+       ])
+
 let coi_natural_number = get_type_union [ zero.stype; coi_positive_number ]
 let coi_non_negative_number = get_type_union [ zero.stype; coi_negative_number ]
-let coi_integer = get_type_union [ coi_negative_number; zero.stype; coi_positive_number ]
+
+let coi_integer =
+  get_type_union [ coi_negative_number; zero.stype; coi_positive_number ]
+
+let ind_natural_number = get_type_union [ zero.stype; ind_positive_number ]
+let ind_non_negative_number = get_type_union [ zero.stype; ind_negative_number ]
+
+let ind_integer =
+  get_type_union [ ind_negative_number; zero.stype; ind_positive_number ]
+
+(* Integer types that include positive and negative infinity *)
+let ind_integer_plus =
+  get_type_union [ ind_negative_number; zero.stype; coi_positive_number ]
+
+let ind_integer_minus =
+  get_type_union [ coi_negative_number; zero.stype; ind_positive_number ]
 
 let coi_pos_even_number =
   build_structured_type [ TypeVar 0 ]
@@ -84,11 +114,26 @@ let coi_pos_even_number =
            get_flat_union_type [ two.stype; generate_succ_rec_step 2 ] );
        ])
 
+let ind_pos_even_number =
+  build_structured_type [ TypeVar 0 ]
+    (build_recursive_context
+       [
+         (Inductive, get_flat_union_type [ two.stype; generate_succ_rec_step 2 ]);
+       ])
+
 let coi_neg_even_number =
   build_structured_type [ TypeVar 0 ]
     (build_recursive_context
        [
          ( Coinductive,
+           get_flat_union_type [ neg_two.stype; generate_pred_rec_step 2 ] );
+       ])
+
+let ind_neg_even_number =
+  build_structured_type [ TypeVar 0 ]
+    (build_recursive_context
+       [
+         ( Inductive,
            get_flat_union_type [ neg_two.stype; generate_pred_rec_step 2 ] );
        ])
 
@@ -100,6 +145,13 @@ let coi_pos_odd_number =
            get_flat_union_type [ one.stype; generate_succ_rec_step 2 ] );
        ])
 
+let ind_pos_odd_number =
+  build_structured_type [ TypeVar 0 ]
+    (build_recursive_context
+       [
+         (Inductive, get_flat_union_type [ one.stype; generate_succ_rec_step 2 ]);
+       ])
+
 let coi_neg_odd_number =
   build_structured_type [ TypeVar 0 ]
     (build_recursive_context
@@ -108,10 +160,23 @@ let coi_neg_odd_number =
            get_flat_union_type [ neg_one.stype; generate_pred_rec_step 2 ] );
        ])
 
+let ind_neg_odd_number =
+  build_structured_type [ TypeVar 0 ]
+    (build_recursive_context
+       [
+         ( Inductive,
+           get_flat_union_type [ neg_one.stype; generate_pred_rec_step 2 ] );
+       ])
+
 let coi_even_integer =
   get_type_union [ coi_neg_even_number; zero.stype; coi_pos_even_number ]
 
 let coi_odd_integer = get_type_union [ coi_neg_odd_number; coi_pos_odd_number ]
+
+let ind_even_integer =
+  get_type_union [ ind_neg_even_number; zero.stype; ind_pos_even_number ]
+
+let ind_odd_integer = get_type_union [ ind_neg_odd_number; ind_pos_odd_number ]
 
 let pos_infinity =
   build_structured_type [ TypeVar 0 ]
