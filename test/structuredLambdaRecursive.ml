@@ -125,3 +125,11 @@ let () =
 let () =
   test "inductive integers do not intersect with infinity"
     (not (has_intersection ind_integer infinity))
+
+let () =
+  test "positive infinity is a unary type"
+    (is_unary pos_infinity)
+
+let () =
+  test "negative infinity is a unary type"
+    (is_unary pos_infinity)
