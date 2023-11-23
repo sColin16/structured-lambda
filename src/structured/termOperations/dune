@@ -1,0 +1,3 @@
+(library
+ (name termOperations)
+ (libraries metatypes termTypes typeOperations))

@@ -1,4 +1,6 @@
-open Structured
+open Structured.Metatypes
+open Structured.TermTypes
+open Structured.TypeOperations.Helpers
 open StructuredHelpers
 
 let name = get_typed_term_unsafe (Const "Name")

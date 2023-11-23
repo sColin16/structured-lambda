@@ -1,5 +1,5 @@
 open Metatypes
-open Term
+open TermTypes
 
 let rec type_to_string (t : structured_type) =
   Printf.sprintf "%s with %s"

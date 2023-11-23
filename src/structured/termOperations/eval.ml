@@ -1,5 +1,6 @@
-open Term
-open TypeOperations
+open TermTypes
+open Typing
+open TypeOperations.Subtype
 
 (** [eval term] evaluates a term to a value *)
 let rec eval (term : term) =

@@ -1,4 +1,4 @@
-open Structured
+open Structured.TermTypes
 open StructuredHelpers
 open StructuredBool
 

@@ -1,0 +1,3 @@
+(library
+ (name typeOperations)
+ (libraries common metatypes baseCaseAlgebra))

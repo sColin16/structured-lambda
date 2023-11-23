@@ -1,4 +1,4 @@
-open Helpers
+open Common.Helpers
 open Metatypes
 
 (* A boolean algebra that tracks expressions that must have base cases to be considered true *)
@@ -48,8 +48,7 @@ let or_disjunctions (dis1 : base_case_disjunction)
     dis1 (flatten_disjunction dis2)
 
 (** Helper to implement the core logic for boolean or *)
-let base_case_or_helper (exp : base_case_expr) (thunk : base_case_thunk)
-    =
+let base_case_or_helper (exp : base_case_expr) (thunk : base_case_thunk) =
   match exp with
   | False -> thunk ()
   | True a -> (
@@ -65,12 +64,11 @@ let base_case_or_helper (exp : base_case_expr) (thunk : base_case_thunk)
 let base_case_or (thunk1 : base_case_thunk) (thunk2 : base_case_thunk) =
   base_case_or_helper (thunk1 ()) thunk2
 
-let rec base_case_exists_rec (curr : base_case_expr) (thunks : base_case_thunk list)
-    =
+let rec base_case_exists_rec (curr : base_case_expr)
+    (thunks : base_case_thunk list) =
   match thunks with
   | [] -> curr
-  | first :: rest ->
-      base_case_exists_rec (base_case_or_helper curr first) rest
+  | first :: rest -> base_case_exists_rec (base_case_or_helper curr first) rest
 
 (** Equivalent to List.exists, but across base case thunks, with short-circuiting *)
 let base_case_exists (thunks : base_case_thunk list) =
@@ -81,37 +79,38 @@ let base_case_exists (thunks : base_case_thunk list) =
 (** Performs a boolean and across two normalized disjunctions, producing a new normalized disjunction *)
 let and_disjunctions (dis1 : base_case_disjunction)
     (dis2 : base_case_disjunction) : base_case_disjunction =
-  let dis_pairs = list_product (flatten_disjunction dis1) (flatten_disjunction dis2) in
+  let dis_pairs =
+    list_product (flatten_disjunction dis1) (flatten_disjunction dis2)
+  in
   let new_dis_list =
-    List.map (fun (first, second) -> TypeVarUnionSet.union first second) dis_pairs
+    List.map
+      (fun (first, second) -> TypeVarUnionSet.union first second)
+      dis_pairs
   in
   (* This is safe because the product of two lists of length at least 1 should also have length at least 1 *)
   (List.hd new_dis_list, List.tl new_dis_list)
 
 (** Helper to implement core logic of boolean and *)
-let base_case_and_helper (exp : base_case_expr)
-    (thunk : base_case_thunk) =
+let base_case_and_helper (exp : base_case_expr) (thunk : base_case_thunk) =
   match exp with
   (* If first expression is false, we avoid evaluating the second thunk *)
   | False -> False
   | True a -> (
       let exp2 = thunk () in
-      match exp2 with
-      | False -> False
-      | True b -> True (and_disjunctions a b))
+      match exp2 with False -> False | True b -> True (and_disjunctions a b))
 
 (** Performs boolean and over *)
 let base_case_and (thunk1 : base_case_thunk) (thunk2 : base_case_thunk) =
   base_case_and_helper (thunk1 ()) thunk2
 
-let rec base_case_for_all_rec (exp : base_case_expr) (thunks : base_case_thunk list)
-    =
+let rec base_case_for_all_rec (exp : base_case_expr)
+    (thunks : base_case_thunk list) =
   match thunks with
   | [] -> exp
-  | first :: rest ->
-      base_case_for_all_rec (base_case_and_helper exp first) rest
+  | first :: rest -> base_case_for_all_rec (base_case_and_helper exp first) rest
 
 (* TODO: consider accepting an arbitrary list and the map function instead of this *)
+
 (** Equivalent to List.for_all, *)
 let base_case_for_all (thunks : base_case_thunk list) =
   match thunks with
@@ -124,4 +123,4 @@ let rec and_conjunctions (conjunctions : base_case_conjunction list) =
   | [] -> TypeVarUnionSet.empty
   | [ conj ] -> conj
   | first :: second :: rest ->
-    and_conjunctions (TypeVarUnionSet.union first second :: rest)
+      and_conjunctions (TypeVarUnionSet.union first second :: rest)

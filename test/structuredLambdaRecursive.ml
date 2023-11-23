@@ -1,4 +1,7 @@
-open LambdaCalculus.Structured
+open LambdaCalculus.Structured.Metatypes
+open LambdaCalculus.Structured.TypeOperations.Subtype
+open LambdaCalculus.Structured.TypeOperations.Intersection
+open LambdaCalculus.Structured.TypeOperations.Unary
 open LambdaCalculus.StructuredRecursive
 open LambdaCalculus.StructuredHelpers
 

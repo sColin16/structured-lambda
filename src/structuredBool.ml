@@ -1,4 +1,3 @@
-open Structured
 open StructuredHelpers
 
 let true_lambda = get_typed_term_unsafe (Const "True")

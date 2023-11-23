@@ -14,12 +14,6 @@ let self_pairs (list : 'a list) =
       if should_include then Some (x1, x2) else None)
     pair_list
 
-let extract_first (list : ('a * 'b) list) =
-  List.map (fun (first, _) -> first) list
-
-let extract_second (list : ('a * 'b) list) =
-  List.map (fun (_, second) -> second) list
-
 let flat_map_opt2 (func : 'a -> 'b -> 'c option) (opta : 'a option)
     (optb : 'b option) =
   match (opta, optb) with

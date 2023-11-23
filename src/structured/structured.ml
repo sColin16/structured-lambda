@@ -1,6 +1,6 @@
-include Metatypes
-include TypeOperations
-include Term
-include StringUtils
-include Helpers
-include Eval
+module Metatypes = Metatypes
+module TermTypes = TermTypes
+module TypeOperations = TypeOperations
+module TermOperations = TermOperations
+module StringUtils = StringUtils
+module Common = Common

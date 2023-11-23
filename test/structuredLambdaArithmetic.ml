@@ -1,4 +1,5 @@
-open LambdaCalculus.Structured
+open LambdaCalculus.Structured.TermOperations.Eval
+open LambdaCalculus.Structured.TypeOperations.Subtype
 open LambdaCalculus.StructuredArithmetic
 
 let test (name : string) (result : bool) =

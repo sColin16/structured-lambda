@@ -1,4 +1,3 @@
-open Structured
 open StructuredHelpers
 open StructuredArithmetic
 open StructuredBool

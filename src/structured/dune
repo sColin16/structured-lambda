@@ -1,2 +1,3 @@
 (library
- (name structured))
+ (name structured)
+ (libraries metatypes termTypes typeOperations termOperations common stringUtils))

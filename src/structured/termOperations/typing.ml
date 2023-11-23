@@ -1,47 +1,18 @@
-open Helpers
+open Common.Helpers
+open TermTypes
 open Metatypes
-open TypeOperations
+open TypeOperations.Helpers
+open TypeOperations.Intersection
+open TypeOperations.Subtype
+open TypeOperations.Context
 
-type term =
-  | Abstraction of (structured_type * term) list
-  | Application of term * term
-  | Variable of int
-  | Const of string
-  | Fix of term
+module TypeContextMap = Map.Make (struct
+  type t = int
 
-let rec shift_type_vars_union (amount : int) (union : union_type) =
-  List.map (shift_type_vars_base amount) union
+  let compare = compare
+end)
 
-and shift_type_vars_base (amount : int) (base_type : base_type) =
-  match base_type with
-  | Label _ -> base_type
-  | TypeVar n -> TypeVar (n + amount)
-  | Intersection functions ->
-      Intersection (List.map (shift_type_vars_func amount) functions)
-
-and shift_type_vars_func (amount : int) ((arg, return) : unary_function) =
-  (shift_type_vars_union amount arg, shift_type_vars_union amount return)
-
-and shift_type_vars_context (amount : int) (context : recursive_context) =
-  List.map (shift_type_vars_def amount) context
-
-and shift_type_vars_def (amount : int) (recursive_def : recursive_def) =
-  let shifted_union = List.map (fun flat_base ->
-    match flat_base with
-    | FLabel _ -> flat_base
-    | FIntersection functions ->
-        FIntersection (List.map (shift_type_vars_func amount) functions)
-  ) recursive_def.flat_union in
-  build_recursive_def recursive_def.kind shifted_union
-
-let get_type_in_context (t : structured_type)
-    (recursive_context : recursive_context) : structured_type =
-  let shift_amount = List.length recursive_context in
-  let new_context = shift_type_vars_context shift_amount t.context in
-  let new_union =
-    shift_type_vars_union (List.length recursive_context) t.union
-  in
-  build_structured_type new_union (recursive_context @ new_context)
+type type_context_map = union_type TypeContextMap.t
 
 (** [type_lambda_term term] determines the type of a term, if it is well-typed *)
 let rec get_type (term : term) = get_type_rec term TypeContextMap.empty (-1) []
@@ -143,3 +114,49 @@ and type_fix_option (context : recursive_context) (fix_option_type : base_type)
       then Some arg_type
       else None
   | _ -> None
+
+(** [get_application_type func_type arg_type] determines the resulting type of
+    applying a term of type [arg_type] to a term of type [func_type], if
+    the function can be applied to the argument *)
+and get_application_type (func : structured_type) (arg : structured_type) :
+    structured_type option =
+  (* Flatten the func type so only labels and intersection types remain *)
+  let func_flat = flatten_union func.union func.context in
+  (* The argument should be applicable to any function in the union, so acquire the type of applying the arg to each option *)
+  let return_types_opt =
+    List.map
+      (fun func_option ->
+        get_application_option_type (func_option, func.context) arg)
+      func_flat
+  in
+  (* Aggregate the return types - if any of them were none, the application is not well-typed *)
+  (* Return types that come back have context func.context, since abstractions determine their return types *)
+  let return_types = opt_list_to_list_opt return_types_opt in
+  (* Join all of the return types into a single union type, add the context *)
+  Option.map
+    (fun return_types_concrete ->
+      build_structured_type (List.flatten return_types_concrete) func.context)
+    return_types
+
+and get_application_option_type
+    ((func_option, context1) : flat_base_type * recursive_context)
+    (arg : structured_type) : union_type option =
+  match func_option with
+  (* A label type cannot be applied *)
+  | FLabel _ -> None
+  (* An application against a function type is well-typed if the function accepts at least as many arguments.
+     The return type is the union of all return types that the argument might match with *)
+  | FIntersection functions ->
+      let func_params = extract_composite_args functions in
+      let exhaustive_arg_coverage =
+        is_subtype arg (build_structured_type func_params context1)
+      in
+      if not exhaustive_arg_coverage then None
+      else
+        Some
+          (List.fold_left
+             (fun acc (func_arg, func_return) ->
+               if has_intersection arg (build_structured_type func_arg context1)
+               then acc @ func_return
+               else acc)
+             [] functions)

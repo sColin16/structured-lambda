@@ -1,0 +1,3 @@
+(library
+ (name termTypes)
+ (libraries metatypes))

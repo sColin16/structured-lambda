@@ -1,4 +1,8 @@
-open Structured
+open Structured.Metatypes
+open Structured.TermTypes
+open Structured.TypeOperations.Context
+open Structured.TypeOperations.Helpers
+open Structured.TermOperations.Typing
 
 type typed_term = { term : term; stype : structured_type }
 

@@ -1,4 +1,3 @@
-open Structured
 open StructuredHelpers
 
 let zero = get_typed_term_unsafe (Const "Zero")
