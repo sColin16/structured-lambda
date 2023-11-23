@@ -42,15 +42,15 @@ let () =
 
 let () =
   test "Pos/neg infinity is not a subtype of inductive integers"
-    (is_subtype infinity ind_integer)
+    (not (is_subtype infinity ind_integer))
 
 let () =
   test "Pos/neg infinity is not a subtype of inductive even integers"
-    (is_subtype infinity ind_even_integer)
+    (not (is_subtype infinity ind_even_integer))
 
 let () =
   test "Pos/neg infinity is not a subtype of inductive odd integers"
-    (is_subtype infinity ind_odd_integer)
+    (not (is_subtype infinity ind_odd_integer))
 
 let () =
   test
