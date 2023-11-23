@@ -4,10 +4,10 @@ structurally-typed functional languages
 
 ## Overview
 Structured Lambda is a simply-typed lambda calculus, augmented with the following features:
-- Singleton types
+- Singleton base types
 - Union types
 - Intersection types
-- Coinductive types
+- Inductive and Coinductive types
 - Structural subtyping
 - General recursion
 
@@ -41,8 +41,6 @@ the nature of union types. The non-optional type is a subtype of the optional
 version of that same type.
 
 ## Features on the Roadmap
-- Inductive types that are well-founded and don't include the infinite structures
-  that coinductive types do
 - Universal type quantification to enable parametric polymorphism (aka "Generics")
   - Bounded quantification to assert properties of the quantified type
 - Existential type quantification to enable ML-style modules
