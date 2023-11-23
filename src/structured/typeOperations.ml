@@ -1,24 +1,6 @@
 open Helpers
-
-type 'a union = 'a list
-type 'a intersection = 'a list
-
-type structured_type = { union : union_type; context : recursive_context }
-and union_type = base_type list
-
-and base_type =
-  | Label of string
-  | Intersection of unary_function list
-  | TypeVar of int
-
-and unary_function = union_type * union_type
-and recursive_context = recursive_def list
-and flat_union_type = flat_base_type list
-and flat_base_type = FLabel of string | FIntersection of unary_function list
-and recursive_def = { kind : recursive_kind; flat_union : flat_union_type }
-and recursive_kind = Inductive | Coinductive
-(* TODO: consider requiring that inductive types are indeed well-founded, at least at this level of abstraction *)
-(* TODO: consider requiring that recursive types are non-empty lists *)
+open Metatypes
+open BaseCaseAlgebra
 
 module TypeVarSet = Set.Make (struct
   type t = int
@@ -32,12 +14,6 @@ module TypeVarPairSet = Set.Make (struct
   let compare = compare
 end)
 
-module TypeVarLoop = Set.Make (struct
-  type t = int * union_type
-
-  let compare = compare
-end)
-
 module TypeContextMap = Map.Make (struct
   type t = int
 
@@ -45,121 +21,6 @@ module TypeContextMap = Map.Make (struct
 end)
 
 type type_context_map = union_type TypeContextMap.t
-
-(* Represents an expression that must have an inductive base case for the expression to be true *)
-type base_case_conjunction = TypeVarLoop.t
-type base_case_disjunction = base_case_conjunction * base_case_conjunction list
-type base_case_expr = False | True of base_case_disjunction
-type base_case_thunk = unit -> base_case_expr
-
-let to_base_case_expr (bool : bool) =
-  if bool then True (TypeVarLoop.empty, []) else False
-
-let is_true (expr : base_case_expr) =
-  match expr with
-  | True (first, rest) -> List.length rest = 0 && TypeVarLoop.is_empty first
-  | _ -> false
-
-let norm_dis (dis : base_case_disjunction) =
-  let first, rest = dis in
-  first :: rest
-
-(* Merges a single conjunction into a normalized disjunction, producing a normalized disjunction *)
-let union_single_conjunction (disjunction : base_case_disjunction)
-    (conjunction : base_case_conjunction) =
-  let normalized_dis = norm_dis disjunction in
-  let is_superset =
-    List.exists
-      (fun dis_elt -> TypeVarLoop.subset dis_elt conjunction)
-      normalized_dis
-  in
-  (* If the conjunction is a superset of an elements in the disjunction, don't change anything *)
-  if is_superset then disjunction
-  else
-    (* Otherwise, use all non-supersets of the conjunction, and add the conjunction to the result *)
-    let non_supersets =
-      List.filter
-        (fun dis_elt -> not (TypeVarLoop.subset conjunction dis_elt))
-        normalized_dis
-    in
-    (conjunction, non_supersets)
-
-(* Merges two normalized disjunctions, producting a normalized disjunction *)
-let union_disjunctions (dis1 : base_case_disjunction)
-    (dis2 : base_case_disjunction) =
-  List.fold_left
-    (fun dis con -> union_single_conjunction dis con)
-    dis1 (norm_dis dis2)
-
-let base_case_or_short_circuit (exp : base_case_expr) (thunk : base_case_thunk)
-    =
-  match exp with
-  | False -> thunk ()
-  | True a -> (
-      if
-        (* Avoid evaluting second thunk if first expression is unconditionally true *)
-        is_true exp
-      then exp
-      else
-        let exp2 = thunk () in
-        match exp2 with False -> exp | True b -> True (union_disjunctions a b))
-
-let base_case_or (thunk1 : base_case_thunk) (thunk2 : base_case_thunk) =
-  base_case_or_short_circuit (thunk1 ()) thunk2
-
-let rec base_case_exists (thunks : base_case_thunk list) =
-  match thunks with
-  | [] -> False
-  | first :: rest -> base_case_exists_rec (first ()) rest
-
-and base_case_exists_rec (curr : base_case_expr) (thunks : base_case_thunk list)
-    =
-  match thunks with
-  | [] -> curr
-  | first :: rest ->
-      base_case_exists_rec (base_case_or_short_circuit curr first) rest
-
-let disjunction_product (dis1 : base_case_disjunction)
-    (dis2 : base_case_disjunction) : base_case_disjunction =
-  let dis_pairs = list_product (norm_dis dis1) (norm_dis dis2) in
-  let dis_list =
-    List.map (fun (first, second) -> TypeVarLoop.union first second) dis_pairs
-  in
-  (* This is safe because the product of two lists of length at least 1 should also have length at least 1 *)
-  (List.hd dis_list, List.tl dis_list)
-
-let base_case_and_short_circuit (exp : base_case_expr)
-    (thunk : base_case_thunk) =
-  match exp with
-  (* If first expression is false, we avoid evaluating the second thunk *)
-  | False -> False
-  | True a -> (
-      let exp2 = thunk () in
-      match exp2 with
-      | False -> False
-      | True b -> True (disjunction_product a b))
-
-let base_case_and (thunk1 : base_case_thunk) (thunk2 : base_case_thunk) =
-  base_case_and_short_circuit (thunk1 ()) thunk2
-
-let rec base_case_for_all (thunks : base_case_thunk list) =
-  match thunks with
-  | [] -> to_base_case_expr true
-  | first :: rest -> base_case_for_all_rec (first ()) rest
-
-and base_case_for_all_rec (exp : base_case_expr) (thunks : base_case_thunk list)
-    =
-  match thunks with
-  | [] -> exp
-  | first :: rest ->
-      base_case_for_all_rec (base_case_and_short_circuit exp first) rest
-
-let rec multi_union (conjunctions : base_case_conjunction list) =
-  match conjunctions with
-  | [] -> TypeVarLoop.empty
-  | [ conj ] -> conj
-  | first :: second :: rest ->
-      multi_union (TypeVarLoop.union first second :: rest)
 
 let build_structured_type (union : union_type) (context : recursive_context) =
   { union; context }
@@ -347,26 +208,26 @@ and is_unary_rec (t : structured_type) (encountered_type_vars : TypeVarSet.t) =
 
 (** [is_subtype type1 type2] determines if [type1] is a subtype of [type2] *)
 let rec is_subtype (t1 : structured_type) (t2 : structured_type) =
-  let thunk = is_subtype_union_rec t1 t2 TypeVarLoop.empty in
+  let thunk = is_subtype_union_rec t1 t2 TypeVarUnionSet.empty in
   is_true (thunk ())
 
 (* Returns a single base case expression, for use in most places *)
 and is_subtype_union_rec (t1 : structured_type) (t2 : structured_type)
-    (encountered_type_vars : TypeVarLoop.t) () =
+    (encountered_type_vars : TypeVarUnionSet.t) () =
   (* A union type is a subtype of another union type, if each base type in the first union is a subtype
      of the second union *)
   base_case_for_all (is_subtype_union_rec_destruct t1 t2 encountered_type_vars)
 
 (* Returns each base case expression separately, so we can process inductive base cases *)
 and is_subtype_union_rec_destruct (t1 : structured_type) (t2 : structured_type)
-    (encountered_type_vars : TypeVarLoop.t) =
+    (encountered_type_vars : TypeVarUnionSet.t) =
   List.map
     (fun base_type ->
       is_base_union_subtype (base_type, t1.context) t2 encountered_type_vars)
     t1.union
 
 and is_base_union_subtype ((t1, c1) : base_type * recursive_context)
-    (t2 : structured_type) (encountered_type_vars : TypeVarLoop.t) =
+    (t2 : structured_type) (encountered_type_vars : TypeVarUnionSet.t) =
   match t1 with
   | Label a -> is_label_union_subtype a t2
   | Intersection functions ->
@@ -389,7 +250,7 @@ and is_label_union_subtype (label : string) (t : structured_type) () =
 
 and is_function_union_subtype
     ((functions, context1) : unary_function intersection * recursive_context)
-    (t : structured_type) (encountered_type_vars : TypeVarLoop.t) () =
+    (t : structured_type) (encountered_type_vars : TypeVarUnionSet.t) () =
   (* Flatten the type with contractivity to only labels and intersections *)
   let flat_union = flatten_union t.union t.context in
   (* Filter out the label types because they don't assist in subtypeing an intersection *)
@@ -416,7 +277,7 @@ and is_function_union_subtype
   base_case_or is_direct_subtype is_indirect_subtype
 
 and is_typevar_union_subtype ((var_num, context1) : int * recursive_context)
-    (t : structured_type) (encountered_type_vars : TypeVarLoop.t) () =
+    (t : structured_type) (encountered_type_vars : TypeVarUnionSet.t) () =
   let union_contains_typevars =
     List.exists
       (fun base_type ->
@@ -430,7 +291,7 @@ and is_typevar_union_subtype ((var_num, context1) : int * recursive_context)
      For inductive types, we will need to perform additional checks *)
   if
     union_contains_typevars
-    && TypeVarLoop.mem (var_num, t.union) encountered_type_vars
+    && TypeVarUnionSet.mem (var_num, t.union) encountered_type_vars
   then
     let union_kinds =
          List.filter_map
@@ -453,7 +314,7 @@ and is_typevar_union_subtype ((var_num, context1) : int * recursive_context)
        else if
          (* Inductive loops of any kind just require a base case, so track that *)
          var_num_kind = Inductive
-       then True (TypeVarLoop.singleton (var_num, t.union), [])
+       then True (TypeVarUnionSet.singleton (var_num, t.union), [])
        else False
   else
     (* Otherwise, expand both sides, removing all type vars *)
@@ -462,7 +323,7 @@ and is_typevar_union_subtype ((var_num, context1) : int * recursive_context)
     (* If the original union had type vars, track it for loop detection *)
     let new_encountered_var =
       if union_contains_typevars then
-        TypeVarLoop.add (var_num, t.union) encountered_type_vars
+        TypeVarUnionSet.add (var_num, t.union) encountered_type_vars
       else encountered_type_vars
     in
     (* If this type variable is coinductive, we shouldn't encounter loops, so just recurse *)
@@ -485,7 +346,7 @@ and is_typevar_union_subtype ((var_num, context1) : int * recursive_context)
       match dis_opt with
       | None -> False
       | Some disjunctions ->
-          let normed_disjunctions = List.map norm_dis disjunctions in
+          let normed_disjunctions = List.map flatten_disjunction disjunctions in
           let dis_combos = multi_list_product normed_disjunctions in
           let resolved_disjunctions =
             List.filter_map
@@ -493,17 +354,17 @@ and is_typevar_union_subtype ((var_num, context1) : int * recursive_context)
                 if
                   (* If there are no loop dependencies, there are no base cases to resolve *)
                   List.for_all
-                    (fun conj -> not (TypeVarLoop.mem (var_num, t.union) conj))
+                    (fun conj -> not (TypeVarUnionSet.mem (var_num, t.union) conj))
                     dis_combo
-                then Some (multi_union dis_combo)
+                then Some (and_conjunctions dis_combo)
                   (* Otherwise, if there is one conjunction that doesn't contain a loop, we found the base case, so resolve it from the dependencies *)
                 else if
                   List.exists
-                    (fun conj -> not (TypeVarLoop.mem (var_num, t.union) conj))
+                    (fun conj -> not (TypeVarUnionSet.mem (var_num, t.union) conj))
                     dis_combo
                 then
-                  let base_conjunction = multi_union dis_combo in
-                  Some (TypeVarLoop.remove (var_num, t.union) base_conjunction)
+                  let base_conjunction = and_conjunctions dis_combo in
+                  Some (TypeVarUnionSet.remove (var_num, t.union) base_conjunction)
                   (* Otherwise, we can't resolve the base case, so this combo resolves to false *)
                 else None)
               dis_combos
@@ -518,7 +379,7 @@ and is_function_subtype_direct
     ((functions, context1) : unary_function intersection * recursive_context)
     ((union_of_intersections, context2) :
       unary_function intersection union * recursive_context)
-    (encountered_type_vars : TypeVarLoop.t) () =
+    (encountered_type_vars : TypeVarUnionSet.t) () =
   (* Check if an intersection exists in the union type that is a direct supertype of the function in question *)
   let exprs =
     List.map
@@ -535,7 +396,7 @@ and is_function_subtype_indirect
     ((functions, context1) : unary_function intersection * recursive_context)
     ((union_of_intersections, context2) :
       unary_function intersection union * recursive_context)
-    (encountered_type_vars : TypeVarLoop.t) () =
+    (encountered_type_vars : TypeVarUnionSet.t) () =
   match union_of_intersections with
   (* If there are 0 or 1 types in the union, we cannot distribute a union, so direct function subtyping would be required *)
   | [] | [ _ ] -> False
@@ -564,7 +425,7 @@ and is_function_subtype_indirect
 and is_intersection_subtype
     ((functions1, context1) : unary_function intersection * recursive_context)
     ((functions2, context2) : unary_function intersection * recursive_context)
-    (encountered_type_vars : TypeVarLoop.t) () =
+    (encountered_type_vars : TypeVarUnionSet.t) () =
   let first_args = extract_composite_args functions1 in
   let second_args = extract_composite_args functions2 in
   let function_pairs = list_product functions1 functions2 in
@@ -591,7 +452,7 @@ and is_intersection_union_subtype
     ((unary_form_functions, context1) :
       unary_function intersection * recursive_context)
     ((function_union, context2) : unary_function union * recursive_context)
-    (encountered_type_vars : TypeVarLoop.t) () =
+    (encountered_type_vars : TypeVarUnionSet.t) () =
   (* We must prove that one function type in the unary form intersection is a subtype of the union *)
   let exprs =
     List.map
@@ -606,7 +467,7 @@ and is_intersection_union_subtype
 and is_unary_func_union_subtype
     (((arg, return), context1) : unary_function * recursive_context)
     ((function_union, context2) : unary_function union * recursive_context)
-    (encountered_type_vars : TypeVarLoop.t) () =
+    (encountered_type_vars : TypeVarUnionSet.t) () =
   let relevant_functions =
     List.filter
       (fun (super_arg, _) ->
@@ -634,7 +495,7 @@ and is_unary_func_union_subtype
 and is_func_subtype_compatible
     (((arg1, return1), context1) : unary_function * recursive_context)
     (((arg2, return2), context2) : unary_function * recursive_context)
-    (encountered_type_vars : TypeVarLoop.t) () =
+    (encountered_type_vars : TypeVarUnionSet.t) () =
   let args_intersect =
     has_intersection
       (build_structured_type arg1 context1)

@@ -1,4 +1,4 @@
-open Type
+open Metatypes
 open Term
 
 let rec type_to_string (t : structured_type) =

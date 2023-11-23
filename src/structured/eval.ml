@@ -1,5 +1,5 @@
 open Term
-open Type
+open TypeOperations
 
 (** [eval term] evaluates a term to a value *)
 let rec eval (term : term) =

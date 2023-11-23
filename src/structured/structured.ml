@@ -1,4 +1,5 @@
-include Type
+include Metatypes
+include TypeOperations
 include Term
 include StringUtils
 include Helpers

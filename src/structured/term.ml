@@ -1,5 +1,6 @@
 open Helpers
-open Type
+open Metatypes
+open TypeOperations
 
 type term =
   | Abstraction of (structured_type * term) list
