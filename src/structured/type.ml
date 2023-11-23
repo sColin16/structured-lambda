@@ -154,12 +154,12 @@ and base_case_for_all_rec (exp : base_case_expr) (thunks : base_case_thunk list)
   | first :: rest ->
       base_case_for_all_rec (base_case_and_short_circuit exp first) rest
 
-let rec multi_intersection (conjunctions : base_case_conjunction list) =
+let rec multi_union (conjunctions : base_case_conjunction list) =
   match conjunctions with
   | [] -> TypeVarLoop.empty
   | [ conj ] -> conj
   | first :: second :: rest ->
-      multi_intersection (TypeVarLoop.inter first second :: rest)
+      multi_union (TypeVarLoop.union first second :: rest)
 
 let build_structured_type (union : union_type) (context : recursive_context) =
   { union; context }
@@ -495,14 +495,14 @@ and is_typevar_union_subtype ((var_num, context1) : int * recursive_context)
                   List.for_all
                     (fun conj -> not (TypeVarLoop.mem (var_num, t.union) conj))
                     dis_combo
-                then Some (multi_intersection dis_combo)
+                then Some (multi_union dis_combo)
                   (* Otherwise, if there is one conjunction that doesn't contain a loop, we found the base case, so resolve it from the dependencies *)
                 else if
                   List.exists
                     (fun conj -> not (TypeVarLoop.mem (var_num, t.union) conj))
                     dis_combo
                 then
-                  let base_conjunction = multi_intersection dis_combo in
+                  let base_conjunction = multi_union dis_combo in
                   Some (TypeVarLoop.remove (var_num, t.union) base_conjunction)
                   (* Otherwise, we can't resolve the base case, so this combo resolves to false *)
                 else None)
