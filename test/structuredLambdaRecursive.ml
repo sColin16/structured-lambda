@@ -12,6 +12,9 @@ let test (name : string) (result : bool) =
 let is_equivalent_type (t1 : structured_type) (t2 : structured_type) =
   is_subtype t1 t2 && is_subtype t2 t1
 
+let is_strict_subtype (t1: structured_type) (t2: structured_type) =
+  is_subtype t1 t2 && not (is_subtype t2 t1)
+
 let () =
   test "Coninductive even or odd integers equal to coinductive integer"
     (is_equivalent_type coi_integer
@@ -21,6 +24,19 @@ let () =
   test "Inductive even or odd integers equal to inductive integer"
     (is_equivalent_type ind_integer
        (get_type_union [ ind_even_integer; ind_odd_integer ]))
+
+let () =
+  test "Inductive integer or pos/neg infinity equal to coinductive integer"
+    (is_equivalent_type coi_integer
+       (get_type_union [ ind_integer; infinity ]))
+
+let () =
+  test "Inductive integers with positive infinity strict subtype of coinductive integers"
+    (is_strict_subtype ind_integer_plus coi_integer)
+
+let () =
+  test "Inductive integers with negative infinity strict subtype of coinductive integers"
+    (is_strict_subtype ind_integer_minus coi_integer)
 
 (* These coinductive types have an inhabited intersection, the infinite function type *)
 let () =

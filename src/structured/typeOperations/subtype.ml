@@ -102,20 +102,11 @@ and is_typevar_union_subtype ((var_num, context1) : int * recursive_context)
            t.union
        in
     (* Coinductive/coinductive loops have no dependencies, like before *)
-    if
-         var_num_kind = Coinductive
-         && List.for_all (fun kind -> kind = Coinductive) union_kinds
-       then to_base_case_expr true
-       else if
-         (* Coinductive/inductive loops fail: subtype may contain infinite type that inductive types do not *)
-         var_num_kind = Coinductive
-         && List.exists (fun kind -> kind = Inductive) union_kinds
-       then False
-       else if
-         (* Inductive loops of any kind just require a base case, so track that *)
-         var_num_kind = Inductive
-       then True (TypeVarUnionSet.singleton (var_num, t.union), [])
-       else False
+    match var_num_kind with
+    (* Coinductive loops are valid if there is at least one coinductive type on the other side *)
+    | Coinductive -> (to_base_case_expr (List.exists (fun kind -> kind = Coinductive) union_kinds))
+    (* Inductive loops of any kind just require a base case, so track that *)
+    | Inductive -> True (TypeVarUnionSet.singleton (var_num, t.union), [])
   else
     (* Otherwise, expand both sides, removing all type vars *)
     let expanded_type_var = expand_type_var var_num context1 in
