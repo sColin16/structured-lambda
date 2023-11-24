@@ -1,16 +1,5 @@
 open Metatypes
 
-let build_structured_type (union : union_type) (context : recursive_context) =
-  { union; context }
-
-let build_recursive_def (kind : recursive_kind) (flat_union : flat_union_type) :
-    recursive_def =
-  { kind; flat_union }
-
-let build_recursive_context (defs : (recursive_kind * flat_union_type) list) :
-    recursive_context =
-  List.map (fun (kind, union) -> build_recursive_def kind union) defs
-
 let extract_first (list : ('a * 'b) list) =
   List.map (fun (first, _) -> first) list
 
@@ -24,40 +13,32 @@ let extract_composite_args (branches : unary_function list) =
 let extract_composite_return (branches : unary_function list) =
   List.flatten (extract_second branches)
 
-(* TODO: consider just accepting a structured type here *)
+let get_type_from_context (var_num : int) (context : recursive_context) =
+  List.nth context var_num
+
+let flatten_base (context : recursive_context) (base_type : base_type) :
+    flat_union_type =
+  match base_type with
+  | Label a -> [ FLabel a ]
+  | Intersection a -> [ FIntersection a ]
+  | TypeVar n -> (get_type_from_context n context).flat_union
+
 let flatten_union (union : union_type) (context : recursive_context) :
     flat_union_type =
-  List.flatten
-    (List.map
-       (fun base_type ->
-         match base_type with
-         | Label a -> [ FLabel a ]
-         | Intersection a -> [ FIntersection a ]
-         | TypeVar n -> (List.nth context n).flat_union)
-       union)
+  List.flatten (List.map (flatten_base context) union)
 
-(* TODO: consider just accepted a structured type here *)
-let flatten_union_contractive (union : union_type) (context : recursive_context)
-    =
+let unflatten_base (flat_base : flat_base_type) : base_type =
+  match flat_base with FLabel a -> Label a | FIntersection a -> Intersection a
+
+let unflatten_union (flat_union : flat_union_type) : union_type =
+  List.map unflatten_base flat_union
+
+(** Converts a union to a union that contains no type vars, while maintaining the union_type *)
+let to_contractive_union (union : union_type) (context : recursive_context) =
   let flat_union = flatten_union union context in
-  let converted_union =
-    List.map
-      (fun base_type ->
-        match base_type with
-        | FLabel a -> Label a
-        | FIntersection functions -> Intersection functions)
-      flat_union
-  in
-  build_structured_type converted_union context
+  unflatten_union flat_union
 
-let expand_type_var_contractive (var_num : int) (context : recursive_context) =
-  let flat_union = (List.nth context var_num).flat_union in
-  let converted_union =
-    List.map
-      (fun base_type ->
-        match base_type with
-        | FLabel a -> Label a
-        | FIntersection a -> Intersection a)
-      flat_union
-  in
-  build_structured_type converted_union context
+(* Expands a type variable into a contractive union type (no type variables in the union) *)
+let expand_type_var_to_union (var_num : int) (context : recursive_context) =
+  let flat_union = (get_type_from_context var_num context).flat_union in
+  unflatten_union flat_union

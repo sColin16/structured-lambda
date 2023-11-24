@@ -2,6 +2,7 @@ open LambdaCalculus.Structured.Metatypes
 open LambdaCalculus.Structured.TypeOperations.Subtype
 open LambdaCalculus.Structured.TypeOperations.Intersection
 open LambdaCalculus.Structured.TypeOperations.Unary
+open LambdaCalculus.Structured.TypeOperations.WellFounded
 open LambdaCalculus.StructuredRecursive
 open LambdaCalculus.StructuredHelpers
 
@@ -129,10 +130,13 @@ let () =
   test "inductive integers do not intersect with infinity"
     (not (has_intersection ind_integer infinity))
 
-let () =
-  test "positive infinity is a unary type"
-    (is_unary pos_infinity)
+let () = test "positive infinity is a unary type" (is_unary pos_infinity)
+let () = test "negative infinity is a unary type" (is_unary pos_infinity)
 
 let () =
-  test "negative infinity is a unary type"
-    (is_unary pos_infinity)
+  test "inductive integers are well-founded"
+    (is_well_founded_union ind_integer.union ind_integer.context)
+
+let () =
+  test "Pos/neg infinity is not well-founded"
+    (not (is_well_founded_union infinity.union infinity.context))

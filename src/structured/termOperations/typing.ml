@@ -2,6 +2,7 @@ open Common.Helpers
 open TermTypes
 open Metatypes
 open TypeOperations.Helpers
+open TypeOperations.Create
 open TypeOperations.Intersection
 open TypeOperations.Subtype
 open TypeOperations.Context

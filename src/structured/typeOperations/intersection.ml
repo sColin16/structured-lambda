@@ -1,5 +1,5 @@
 open Common.Helpers
-open Helpers
+open Create
 open Metatypes
 
 module TypeVarPairSet = Set.Make (struct
@@ -43,13 +43,13 @@ and has_intersection_base_rec ((t1, c1) : base_type * recursive_context)
   (* Handle cases where one of the types is a type variable, expanding that type out and recursing *)
   | TypeVar n, Label _ | TypeVar n, Intersection _ ->
       has_intersection_rec
-        (expand_type_var_contractive n c1)
+        (expand_type_var n c1)
         (build_structured_type [ t2 ] c2)
         encountered_type_vars
   | Label _, TypeVar n | Intersection _, TypeVar n ->
       has_intersection_rec
         (build_structured_type [ t1 ] c1)
-        (expand_type_var_contractive n c2)
+        (expand_type_var n c2)
         encountered_type_vars
   (* Finally, handle the potential loop case *)
   | TypeVar n, TypeVar m ->
@@ -60,8 +60,8 @@ and has_intersection_base_rec ((t1, c1) : base_type * recursive_context)
       else
         (* If we don't encounter a loop, we expand both sides and recurse, tracking this pair to detect a future loop *)
         has_intersection_rec
-          (expand_type_var_contractive n c1)
-          (expand_type_var_contractive m c2)
+          (expand_type_var n c1)
+          (expand_type_var m c2)
           (TypeVarPairSet.add (n, m) encountered_type_vars)
 
 and has_intersection_func

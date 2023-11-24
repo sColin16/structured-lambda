@@ -1,5 +1,5 @@
 open Metatypes
-open Helpers
+open Create
 
 let rec shift_type_vars_union (amount : int) (union : union_type) =
   List.map (shift_type_vars_base amount) union

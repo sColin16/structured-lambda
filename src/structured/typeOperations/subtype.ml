@@ -1,4 +1,5 @@
 open Common.Helpers
+open Create
 open Helpers
 open BaseCaseAlgebra
 open Metatypes
@@ -117,8 +118,8 @@ and is_typevar_union_subtype ((var_num, context1) : int * recursive_context)
        else False
   else
     (* Otherwise, expand both sides, removing all type vars *)
-    let expanded_type_var = expand_type_var_contractive var_num context1 in
-    let flat_union = flatten_union_contractive t.union t.context in
+    let expanded_type_var = expand_type_var var_num context1 in
+    let flat_union = to_contractive_type t.union t.context in
     (* If the original union had type vars, track it for loop detection *)
     let new_encountered_var =
       if union_contains_typevars then
