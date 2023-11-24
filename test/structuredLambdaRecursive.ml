@@ -131,12 +131,8 @@ let () =
     (not (is_subtype neg_two.stype coi_odd_integer))
 
 let () =
-  test "inductive integers are a subtype of coninductive integers"
-    (is_subtype ind_integer coi_integer)
-
-let () =
-  test "coinductive integers are not a subtype of inductive integers"
-    (not (is_subtype coi_integer ind_integer))
+  test "inductive integers are a strict subtype of coninductive integers"
+    (is_strict_subtype ind_integer coi_integer)
 
 let () =
   test "coinductive and inductive integers have an intersction"
