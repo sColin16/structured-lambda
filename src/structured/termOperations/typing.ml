@@ -143,8 +143,9 @@ and get_application_option_type
     ((func_option, context1) : flat_base_type * recursive_context)
     (arg : structured_type) : union_type option =
   match func_option with
-  (* A label type cannot be applied *)
-  | FLabel _ -> None
+  (* Label types, universal quantifications, and their variables cannot be applied *)
+  (* TODO: some variables may be able to be applied under bounded quantification *)
+  | FLabel _ | FUnivTypeVar _ | FUnivQuantification _ -> None
   (* An application against a function type is well-typed if the function accepts at least as many arguments.
      The return type is the union of all return types that the argument might match with *)
   | FIntersection functions ->

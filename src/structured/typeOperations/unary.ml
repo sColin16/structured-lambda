@@ -50,7 +50,16 @@ and is_unary_rec (t : structured_type) (encountered_type_vars : TypeVarSet.t) =
                 && is_unary_rec
                      (build_structured_type return t.context)
                      new_encountered_vars)
-              functions)
+              functions
+        (* Universally quantified variables can't be unary, even with bounding, because you can always intersect
+           the bound with a type that involves a union to obtain a valid subtype under the bound *)
+        | FUnivTypeVar _ -> false
+        (* Universal quantification is unary if its contents are unary. Like with well-foundedness, this means
+           you can't reference the variable inside of the quantification, so unclear how useful this is *)
+        | FUnivQuantification univ_union ->
+            is_unary_rec
+              (build_structured_type univ_union t.context)
+              encountered_type_vars)
     (* A multiple type union is not considered unary. In theory it may be possible to rewrite as a single base type
        but we can do that later *)
     | _ :: _ -> false

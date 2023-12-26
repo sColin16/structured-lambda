@@ -35,6 +35,12 @@ and is_well_founded_base (context: recursive_context) (visited: TypeVarSet.t) (b
       let new_visited = TypeVarSet.add n visited in
       let expanded_union = expand_type_var_to_union n context in
       is_well_founded_union_rec expanded_union context new_visited
+  (* Universally quantified type variables can't be well-founded, even with bounding,
+     because you can always intersect that bound with a non-well-founded type to end up with a valid subtype in the bound *)
+  | UnivTypeVar _ -> false
+  (* We consider universal quantification well-founded if the body is well-founded, which basically
+     means that the type can't contain its own variables, so not sure how useful this is *)
+  | UnivQuantification t -> is_well_founded_union_rec t context visited
 
 and is_well_founded_func (context: recursive_context) (visited: TypeVarSet.t) (arg, return: unary_function) =
   (* A function type is well-founded if bot the arguments and return type are *)

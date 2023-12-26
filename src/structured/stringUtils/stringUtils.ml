@@ -27,7 +27,9 @@ and flat_union_type_to_string (flat_union : flat_union_type) =
       (fun flat_base ->
         match flat_base with
         | FLabel a -> Label a
-        | FIntersection functions -> Intersection functions)
+        | FIntersection functions -> Intersection functions
+        | FUnivTypeVar a -> UnivTypeVar a
+        | FUnivQuantification a -> UnivQuantification a)
       flat_union
   in
   union_type_to_string union_type
@@ -38,6 +40,8 @@ and base_type_to_string (base_type : base_type) =
   | Intersection func_list ->
       Printf.sprintf "{%s}" (func_type_to_string func_list)
   | RecTypeVar n -> Printf.sprintf "R(%i)" n
+  | UnivTypeVar n -> Printf.sprintf "U(%i)" n
+  | UnivQuantification t -> Printf.sprintf "forall.(%s)" (union_type_to_string t)
 
 and func_type_to_string (func_list : unary_function list) =
   String.concat "," (List.map unary_func_type_to_string func_list)
