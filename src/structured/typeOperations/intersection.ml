@@ -41,18 +41,18 @@ and has_intersection_base_rec ((t1, c1) : base_type * recursive_context)
           has_intersection_func (f1, c1) (f2, c2) encountered_type_vars)
         function_pairs
   (* Handle cases where one of the types is a type variable, expanding that type out and recursing *)
-  | TypeVar n, Label _ | TypeVar n, Intersection _ ->
+  | RecTypeVar n, Label _ | RecTypeVar n, Intersection _ ->
       has_intersection_rec
         (expand_type_var n c1)
         (build_structured_type [ t2 ] c2)
         encountered_type_vars
-  | Label _, TypeVar n | Intersection _, TypeVar n ->
+  | Label _, RecTypeVar n | Intersection _, RecTypeVar n ->
       has_intersection_rec
         (build_structured_type [ t1 ] c1)
         (expand_type_var n c2)
         encountered_type_vars
   (* Finally, handle the potential loop case *)
-  | TypeVar n, TypeVar m ->
+  | RecTypeVar n, RecTypeVar m ->
       (* If we encounter a loop, intersection exists between two coinductive, but not
          if inductive types are involved at all, since they require a well-founded intersection *)
       if TypeVarPairSet.mem (n, m) encountered_type_vars then

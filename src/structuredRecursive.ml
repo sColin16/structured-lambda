@@ -48,10 +48,10 @@ and generate_rec_step_rec (name_type : structured_type) (base_type : union_type)
       (num - 1)
 
 let generate_succ_rec_step (num : int) =
-  generate_rec_step succ.stype [ TypeVar 0 ] num
+  generate_rec_step succ.stype [ RecTypeVar 0 ] num
 
 let generate_pred_rec_step (num : int) =
-  generate_rec_step pred.stype [ TypeVar 0 ] num
+  generate_rec_step pred.stype [ RecTypeVar 0 ] num
 
 let one = generate_typed_num 1
 let two = generate_typed_num 2
@@ -59,7 +59,7 @@ let neg_one = generate_typed_num (-1)
 let neg_two = generate_typed_num (-2)
 
 let coi_positive_number =
-  build_structured_type [ TypeVar 0 ]
+  build_structured_type [ RecTypeVar 0 ]
     (build_recursive_context
        [
          ( Coinductive,
@@ -67,14 +67,14 @@ let coi_positive_number =
        ])
 
 let ind_positive_number =
-  build_structured_type [ TypeVar 0 ]
+  build_structured_type [ RecTypeVar 0 ]
     (build_recursive_context
        [
          (Inductive, get_flat_union_type [ one.stype; generate_succ_rec_step 1 ]);
        ])
 
 let coi_negative_number =
-  build_structured_type [ TypeVar 0 ]
+  build_structured_type [ RecTypeVar 0 ]
     (build_recursive_context
        [
          ( Coinductive,
@@ -82,7 +82,7 @@ let coi_negative_number =
        ])
 
 let ind_negative_number =
-  build_structured_type [ TypeVar 0 ]
+  build_structured_type [ RecTypeVar 0 ]
     (build_recursive_context
        [
          ( Inductive,
@@ -109,7 +109,7 @@ let ind_integer_minus =
   get_type_union [ coi_negative_number; zero.stype; ind_positive_number ]
 
 let coi_pos_even_number =
-  build_structured_type [ TypeVar 0 ]
+  build_structured_type [ RecTypeVar 0 ]
     (build_recursive_context
        [
          ( Coinductive,
@@ -117,14 +117,14 @@ let coi_pos_even_number =
        ])
 
 let ind_pos_even_number =
-  build_structured_type [ TypeVar 0 ]
+  build_structured_type [ RecTypeVar 0 ]
     (build_recursive_context
        [
          (Inductive, get_flat_union_type [ two.stype; generate_succ_rec_step 2 ]);
        ])
 
 let coi_neg_even_number =
-  build_structured_type [ TypeVar 0 ]
+  build_structured_type [ RecTypeVar 0 ]
     (build_recursive_context
        [
          ( Coinductive,
@@ -132,7 +132,7 @@ let coi_neg_even_number =
        ])
 
 let ind_neg_even_number =
-  build_structured_type [ TypeVar 0 ]
+  build_structured_type [ RecTypeVar 0 ]
     (build_recursive_context
        [
          ( Inductive,
@@ -140,7 +140,7 @@ let ind_neg_even_number =
        ])
 
 let coi_pos_odd_number =
-  build_structured_type [ TypeVar 0 ]
+  build_structured_type [ RecTypeVar 0 ]
     (build_recursive_context
        [
          ( Coinductive,
@@ -148,14 +148,14 @@ let coi_pos_odd_number =
        ])
 
 let ind_pos_odd_number =
-  build_structured_type [ TypeVar 0 ]
+  build_structured_type [ RecTypeVar 0 ]
     (build_recursive_context
        [
          (Inductive, get_flat_union_type [ one.stype; generate_succ_rec_step 2 ]);
        ])
 
 let coi_neg_odd_number =
-  build_structured_type [ TypeVar 0 ]
+  build_structured_type [ RecTypeVar 0 ]
     (build_recursive_context
        [
          ( Coinductive,
@@ -163,7 +163,7 @@ let coi_neg_odd_number =
        ])
 
 let ind_neg_odd_number =
-  build_structured_type [ TypeVar 0 ]
+  build_structured_type [ RecTypeVar 0 ]
     (build_recursive_context
        [
          ( Inductive,
@@ -181,12 +181,12 @@ let ind_even_integer =
 let ind_odd_integer = get_type_union [ ind_neg_odd_number; ind_pos_odd_number ]
 
 let pos_infinity =
-  build_structured_type [ TypeVar 0 ]
+  build_structured_type [ RecTypeVar 0 ]
     (build_recursive_context
        [ (Coinductive, get_flat_union_type [ generate_succ_rec_step 1 ]) ])
 
 let neg_infinity =
-  build_structured_type [ TypeVar 0 ]
+  build_structured_type [ RecTypeVar 0 ]
     (build_recursive_context
        [ (Coinductive, get_flat_union_type [ generate_pred_rec_step 1 ]) ])
 

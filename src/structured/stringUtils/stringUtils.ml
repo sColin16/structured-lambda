@@ -37,7 +37,7 @@ and base_type_to_string (base_type : base_type) =
   | Label name -> name
   | Intersection func_list ->
       Printf.sprintf "{%s}" (func_type_to_string func_list)
-  | TypeVar n -> Printf.sprintf "R(%i)" n
+  | RecTypeVar n -> Printf.sprintf "R(%i)" n
 
 and func_type_to_string (func_list : unary_function list) =
   String.concat "," (List.map unary_func_type_to_string func_list)

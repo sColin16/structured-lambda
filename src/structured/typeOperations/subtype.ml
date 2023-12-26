@@ -25,7 +25,7 @@ and is_base_union_subtype ((t1, c1) : base_type * recursive_context)
   | Label a -> is_label_union_subtype a t2
   | Intersection functions ->
       is_function_union_subtype (functions, c1) t2 encountered_type_vars
-  | TypeVar n -> is_typevar_union_subtype (n, c1) t2 encountered_type_vars
+  | RecTypeVar n -> is_typevar_union_subtype (n, c1) t2 encountered_type_vars
 
 and is_label_union_subtype (label : string) (t : structured_type) =
   let flat_union = flatten_union t.union t.context in
@@ -73,7 +73,7 @@ and is_typevar_union_subtype ((var_num, context1) : int * recursive_context)
     List.exists
       (fun base_type ->
         match base_type with
-        | TypeVar _ -> true
+        | RecTypeVar _ -> true
         | Label _ | Intersection _ -> false)
       t.union
   in
@@ -87,7 +87,7 @@ and is_typevar_union_subtype ((var_num, context1) : int * recursive_context)
     let union_has_coinductive = List.exists
       (fun base_type ->
         match base_type with
-        | TypeVar n -> ((List.nth t.context n).kind = Coinductive)
+        | RecTypeVar n -> ((List.nth t.context n).kind = Coinductive)
         | Label _ | Intersection _ -> false)
       t.union in
     match var_num_kind with

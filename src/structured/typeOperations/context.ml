@@ -7,7 +7,7 @@ let rec shift_type_vars_union (amount : int) (union : union_type) =
 and shift_type_vars_base (amount : int) (base_type : base_type) =
   match base_type with
   | Label _ -> base_type
-  | TypeVar n -> TypeVar (n + amount)
+  | RecTypeVar n -> RecTypeVar (n + amount)
   | Intersection functions ->
       Intersection (List.map (shift_type_vars_func amount) functions)
 

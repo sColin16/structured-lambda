@@ -14,7 +14,7 @@ let rec is_unary (t : structured_type) = is_unary_rec t TypeVarSet.empty
 and is_unary_rec (t : structured_type) (encountered_type_vars : TypeVarSet.t) =
   let type_var_num =
     if List.length t.union = 1 then
-      match List.hd t.union with TypeVar n -> Some n | _ -> None
+      match List.hd t.union with RecTypeVar n -> Some n | _ -> None
     else None
   in
   let is_type_var = Option.is_some type_var_num in

@@ -7,7 +7,7 @@ and union_type = base_type list
 and base_type =
   | Label of string
   | Intersection of unary_function list
-  | TypeVar of int
+  | RecTypeVar of int
 
 and unary_function = union_type * union_type
 and recursive_context = recursive_def list

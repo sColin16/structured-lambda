@@ -28,7 +28,7 @@ and is_well_founded_base (context: recursive_context) (visited: TypeVarSet.t) (b
   | Label _ -> true
   (* Intersections are well-founded if each function in the intersection is well-founded *)
   | Intersection functions -> List.for_all (is_well_founded_func context visited) functions
-  | TypeVar n ->
+  | RecTypeVar n ->
     (* If we encounter a type-var loop, this branch of the type is not well-founded *)
     if TypeVarSet.mem n visited then false else
       (* Otherwise, track the type var, expand, and recurse *)
