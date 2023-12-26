@@ -34,8 +34,7 @@ and is_label_union_subtype (label : string) (t : structured_type) =
   let flat_union = flatten_union t.union t.context in
   (* A label is a subtype of an equivalent label in the union, or the top type *)
   List.exists
-    (fun flat_union_elt ->
-      match flat_union_elt with
+    (function
       | FLabel a -> a = label
       | FIntersection [] -> true
       | FIntersection (_ :: _) -> false
@@ -80,8 +79,7 @@ and is_typevar_union_subtype ((var_num, context1) : int * recursive_context)
     (t : structured_type) (encountered_type_vars : TypeVarUnionSet.t) =
   let union_contains_typevars =
     List.exists
-      (fun base_type ->
-        match base_type with
+      (function
         | RecTypeVar _ -> true
         | Label _ | Intersection _ | UnivQuantification _ | UnivTypeVar _ ->
             false)
@@ -99,7 +97,8 @@ and is_typevar_union_subtype ((var_num, context1) : int * recursive_context)
         (fun base_type ->
           match base_type with
           | RecTypeVar n -> (List.nth t.context n).kind = Coinductive
-          | Label _ | Intersection _ | UnivTypeVar _ | UnivQuantification _ -> false)
+          | Label _ | Intersection _ | UnivTypeVar _ | UnivQuantification _ ->
+              false)
         t.union
     in
     match var_num_kind with

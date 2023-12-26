@@ -19,13 +19,13 @@ and recursive_context_to_string (recursive_context : recursive_context) =
 and recursive_def_to_string (num : int) (def : recursive_def) =
   if def.kind = Coinductive then
     Printf.sprintf "Coind:%i->%s" num (flat_union_type_to_string def.flat_union)
-  else Printf.sprintf "Ind:%i->%s" num (flat_union_type_to_string def.flat_union)
+  else
+    Printf.sprintf "Ind:%i->%s" num (flat_union_type_to_string def.flat_union)
 
 and flat_union_type_to_string (flat_union : flat_union_type) =
   let union_type =
     List.map
-      (fun flat_base ->
-        match flat_base with
+      (function
         | FLabel a -> Label a
         | FIntersection functions -> Intersection functions
         | FUnivTypeVar a -> UnivTypeVar a
@@ -41,7 +41,8 @@ and base_type_to_string (base_type : base_type) =
       Printf.sprintf "{%s}" (func_type_to_string func_list)
   | RecTypeVar n -> Printf.sprintf "R(%i)" n
   | UnivTypeVar n -> Printf.sprintf "U(%i)" n
-  | UnivQuantification t -> Printf.sprintf "forall.(%s)" (union_type_to_string t)
+  | UnivQuantification t ->
+      Printf.sprintf "forall.(%s)" (union_type_to_string t)
 
 and func_type_to_string (func_list : unary_function list) =
   String.concat "," (List.map unary_func_type_to_string func_list)

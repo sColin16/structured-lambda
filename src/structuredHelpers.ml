@@ -43,11 +43,10 @@ let get_type_intersection (types : structured_type list) : structured_type =
   in
   base_to_structured_type (Intersection intersection)
 
-let get_flat_union_type (union_types: structured_type list): flat_union_type =
+let get_flat_union_type (union_types : structured_type list) : flat_union_type =
   let union_type = get_type_union union_types in
   List.map
-    (fun base_type ->
-      match base_type with
+    (function
       | Label a -> FLabel a
       | Intersection a -> FIntersection a
       | _ -> raise (Invalid_argument "got non-flat type"))
