@@ -48,3 +48,9 @@ let rec multi_list_product (nested_list: 'a list tuple): 'a tuple list =
   | l1::tail ->
     let tail_product = multi_list_product tail in
     helper [] l1 tail_product
+
+let short_circuit_and (exp1: unit -> bool) (exp2: unit -> bool) =
+  if exp1 () then exp2 () else false
+
+let short_circuit_or (exp1: unit -> bool) (exp2: unit -> bool) =
+  if exp1() then true else exp2 ()

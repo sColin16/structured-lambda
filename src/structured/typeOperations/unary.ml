@@ -8,9 +8,6 @@ module TypeVarSet = Set.Make (struct
   let compare = compare
 end)
 
-(* TODO: maybe inductive types that aren't well-founded should be considered unary? Maybe covered if we restrict
-   recursive types to be non-empty lists, require inductive types to be well-founded as well *)
-
 (** [is_unary union_type] determines if a type cannot be written as the union of two distinct, unrelated types *)
 let rec is_unary (t : structured_type) = is_unary_rec t TypeVarSet.empty
 
@@ -36,9 +33,9 @@ and is_unary_rec (t : structured_type) (encountered_type_vars : TypeVarSet.t) =
     in
     let flat_union = flatten_union t.union t.context in
     match flat_union with
-    (* Under the rewriting equality rule, the empty type is considered "unary" even though it's really more nullary *)
+    (* Under the rewriting equality definition, the empty type is considered "unary" even though it's really more nullary *)
     | [] -> true
-    (* A single type in a union is considered unary if the corresponding base type *)
+    (* A single type in a union is considered unary if the corresponding base type is *)
     | [ base ] -> (
         match base with
         (* Labels are unary be definition *)
