@@ -9,7 +9,6 @@ Structured Lambda is a simply-typed lambda calculus, augmented with the followin
 - Intersection types
 - Inductive and Coinductive types
 - Structural subtyping
-- General recursion
 
 Structured Lambda's differentiating feature is its structural type system, which allows
 is to directly and umambiguously represent a wide range of common language constructs,
@@ -27,6 +26,7 @@ Here are some of the language constructs Structured Lambda can represent:
 - Integers/strings of arbitrary size
 - Functions
   - Including overloaded functions (ad-hoc polymorphism)
+  - Including recursive functions
 - Classes
 
 Unlike most simply-typed lambda calculi that represent sum and product types as

@@ -5,4 +5,3 @@ type term =
   | Application of term * term
   | Variable of int
   | Const of string
-  | Fix of term

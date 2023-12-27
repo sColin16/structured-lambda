@@ -83,25 +83,6 @@ and get_type_rec (term : term) (type_context : type_context_map) (level : int)
       Option.map
         (fun union_type -> build_structured_type union_type recursive_context)
         union_type_opt
-  | Fix inner_term ->
-      let inner_type_opt =
-        get_type_rec inner_term type_context level recursive_context
-      in
-      (* The approach here is that we type each types in the union of the sub-term. If any of them are ill-typed, this term is ill-typed as well
-          If they are all well-typed, we join all the resulting union types together, and bubble up the subterms recursive context *)
-      Option.join
-        (Option.map
-           (fun inner_type ->
-             let fixed_option_types =
-               List.map (type_fix_option recursive_context) inner_type.union
-             in
-             let fixed_types_opt = opt_list_to_list_opt fixed_option_types in
-             let fixed_type_opt = Option.map List.flatten fixed_types_opt in
-             Option.map
-               (fun fixed_type ->
-                 build_structured_type fixed_type inner_type.context)
-               fixed_type_opt)
-           inner_type_opt)
 
 and type_fix_option (context : recursive_context) (fix_option_type : base_type)
     =
