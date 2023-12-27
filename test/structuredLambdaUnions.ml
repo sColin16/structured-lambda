@@ -4,11 +4,12 @@ open LambdaCalculus.Structured.TypeOperations.Intersection
 open LambdaCalculus.StructuredBool
 open LambdaCalculus.StructuredUnions
 open LambdaCalculus.StructuredHelpers
+open LambdaCalculus.Structured.TermOperations.ValToTerm
 
 let test (name : string) (result : bool) =
   Printf.printf "%s: %s\n" (if result then "PASS" else "FAIL") name
 
-let evaluates_to term value = eval term = value
+let evaluates_to term value = value_to_term (eval term) = value
 
 let () =
   test "Exhaustive function coverage of union A"

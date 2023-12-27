@@ -121,9 +121,11 @@ let decrement_three_bit =
          (zero.stype, seven.term);
        ])
 
+let fix_binary_num_op = fix three_bit_num.union unary_num_type.union
+
 let add_three_bit =
   get_typed_term_unsafe
-    (Fix
+    (fix_binary_num_op
        (Abstraction
           [
             ( binary_num_type,
