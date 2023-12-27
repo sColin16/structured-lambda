@@ -6,3 +6,9 @@ type term =
   | Variable of int
   | Const of string
   | Fix of term
+
+and value =
+  | Closure of (structured_type * term) list * environment
+  | VConst of string
+
+and environment = value list
