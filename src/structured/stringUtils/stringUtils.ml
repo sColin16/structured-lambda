@@ -63,6 +63,10 @@ let rec term_to_string (term : term) =
   | Fix term ->
       let inner_string = term_to_string term in
       Printf.sprintf "Fix(%s)" inner_string
+  | TypeAbstraction inner_term ->
+      Printf.sprintf "\\T.{%s}" (term_to_string inner_term)
+  | TypeApplication (inner_term, inner_type) ->
+      Printf.sprintf "(%s) [%s]" (term_to_string inner_term) (type_to_string inner_type)
 
 and branch_to_string (branch_type, branch_body) =
   Printf.sprintf "%s:%s"

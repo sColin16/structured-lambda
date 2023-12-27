@@ -102,6 +102,20 @@ and get_type_rec (term : term) (type_context : type_context_map) (level : int)
                  build_structured_type fixed_type inner_type.context)
                fixed_type_opt)
            inner_type_opt)
+  | TypeAbstraction inner_term ->
+      let inner_type_opt =
+        get_type_rec inner_term type_context level recursive_context
+      in
+      None
+      (* TODO: I need to bubble the inner recursive context variables *)
+  | TypeApplication (inner_term, inner_type) ->
+      let applied_term_type_opt =
+        get_type_rec inner_term type_context level recursive_context
+      in
+      Option.map
+        (fun applied_term_type ->
+          get_type_application_type applied_term_type inner_type)
+        applied_term_type_opt
 
 and type_fix_option (context : recursive_context) (fix_option_type : base_type)
     =
@@ -162,3 +176,38 @@ and get_application_option_type
                then acc @ func_return
                else acc)
              [] functions)
+
+and get_type_application_type (func : structured_type)
+    (type_arg : structured_type) =
+  (* Flatten the func type to get rid of recursive types *)
+  let func_flat = flatten_union func.union func.context in
+  (* The type argument is applicable to any universal quantification in the union, so determine the types resulting
+     from applying the type argument to each universal quantification in the union *)
+  let return_types_opt =
+    List.map
+      (fun func_option ->
+        get_type_application_option_type (func_option, func.context) type_arg)
+      func_flat
+  in
+  (* Aggregate the return types - if any of them were none, the application is not well-typed *)
+  let return_types = opt_list_to_list_opt return_types_opt in
+  None
+(* TODO: complete the aggregation, I believe the func.context is the right context to use, following
+   in the type of the term applications, but I need to think it through. Maybe the types need to be
+   merged *)
+
+and get_type_application_option_type
+    ((func_option, context1) : flat_base_type * recursive_context)
+    (type_arg : structured_type) : union_type option =
+  match func_option with
+  (* Only universal quantification can have type applications
+     Universal type variables may be instantiated with quantification (assuming impredicativity)
+     but it's not guaranteed *)
+  | FLabel _ | FIntersection _ | FUnivTypeVar _ -> None
+  (* If we had bounded quantification, we'd need to make sure the type argument provided is valid *)
+  | FUnivQuantification inner_union_type -> None
+(* TODO: we basically need the application semantics here with levels and stuff to track
+   the type we are applying against
+
+   Or maybe we actually jus tneed the shifting semantics again?
+   *)
