@@ -20,7 +20,6 @@ and eval_rec (term : term) (env : environment) : value =
       match eval_rec left_term env with
       | Closure (left_branches, left_env) ->
           let right_value = eval_rec right_term env in
-          (* TODO: can we pass the right_value here, and get the type of the value? *)
           let resolved_branch =
             resolve_branch left_branches (value_to_term right_value)
           in
