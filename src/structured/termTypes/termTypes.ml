@@ -5,7 +5,6 @@ type term =
   | Application of term * term
   | Variable of int
   | Const of string
-  | Fix of term
 
 and value =
   | Closure of (structured_type * term) list * environment

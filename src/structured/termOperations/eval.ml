@@ -13,21 +13,10 @@ let rec eval (term : term): value =
   | Const _
   | Application (Const _, _) ->
       term
-  (* Evaluate a fix point abstraction *)
-  | Fix inner_term -> (
-      let inner_evaluated = eval inner_term in
-      match inner_evaluated with
-      | Abstraction [ (abs_type, abs_body) ] ->
-          eval
-            (substitute (Fix (Abstraction [ (abs_type, abs_body) ])) abs_body)
-      | _ -> Fix inner_evaluated)
   (* Evaluate the LHS of an application first *)
   | Application (Application (t1, t2), t3) ->
       let left_evaluated = eval (Application (t1, t2)) in
       eval (Application (left_evaluated, t3))
-  | Application (Fix t1, t2) ->
-      let fix_evaluated = eval (Fix t1) in
-      eval (Application (fix_evaluated, t2))
   (* Then evaluate the RHS of an application *)
   | Application (Abstraction t1, Application (t2, t3)) ->
       let right_evaluated = eval (Application (t2, t3)) in
@@ -100,7 +89,6 @@ and substitute_rec (variable_num : int) (with_term : term) (in_term : term) =
         ( substitute_rec variable_num with_term t1,
           substitute_rec variable_num with_term t2 )
   | Const _ -> in_term
-  | Fix inner_term -> Fix (substitute_rec variable_num with_term inner_term)
 
 and shift (term : term) (shift_amt : int) = shift_rec term shift_amt 0
 
@@ -120,4 +108,3 @@ and shift_rec (term : term) (shift_amt : int) (cutoff : int) =
   | Application (t1, t2) ->
       Application (shift_rec t1 shift_amt cutoff, shift_rec t2 shift_amt cutoff)
   | Const _ -> term
-  | Fix inner_term -> Fix (shift_rec inner_term shift_amt cutoff)

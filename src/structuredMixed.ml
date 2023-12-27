@@ -29,9 +29,11 @@ let is_zero =
            false_lambda.term );
        ])
 
+let fix_even_odd = fix is_even_odd_label.union num_to_bool.union
+
 let is_even_odd =
   get_typed_term_unsafe
-    (Fix
+    (fix_even_odd
        (Abstraction
           [
             ( func_to_structured_type

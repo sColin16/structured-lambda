@@ -52,3 +52,48 @@ let get_flat_union_type (union_types: structured_type list): flat_union_type =
       | Intersection a -> FIntersection a
       | _ -> raise (Invalid_argument "got non-flat type"))
     union_type.union
+
+(* Constructs the Z-combinator for a function of a given type, a fixed-point
+    combinator for call-by-value semantics *)
+let build_fix (arg_type : union_type) (return_type : union_type) =
+  let func_type = (func_to_structured_type (arg_type, return_type)).union in
+  let fix_context =
+    build_recursive_context
+      [ (Coinductive, [ FIntersection [ ([ TypeVar 0 ], func_type) ] ]) ]
+  in
+  let fix =
+    get_typed_term_unsafe
+      (Abstraction
+         [
+           ( func_to_structured_type (func_type, func_type),
+             Application
+               ( Abstraction
+                   [
+                     ( build_structured_type [ TypeVar 0 ] fix_context,
+                       Application
+                         ( Variable 1,
+                           Abstraction
+                             [
+                               ( union_to_structured_type arg_type,
+                               Application( Application (Variable 1, Variable 1), Variable 0) );
+                             ] ) );
+                   ],
+                 Abstraction
+                   [
+                     ( build_structured_type [ TypeVar 0 ] fix_context,
+                       Application
+                         ( Variable 1,
+                           Abstraction
+                             [
+                               ( union_to_structured_type arg_type,
+                                 Application( Application (Variable 1, Variable 1), Variable 0) );
+                             ] ) );
+                   ] ) );
+         ])
+  in
+  fix
+
+(* Fixes a provided abstraction with the given arg and return type *)
+let fix (arg_type: union_type) (return_type: union_type) (term: term) =
+  let fix_term = build_fix arg_type return_type in
+  Application(fix_term.term, term)
