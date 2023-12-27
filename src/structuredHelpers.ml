@@ -43,7 +43,7 @@ let get_type_intersection (types : structured_type list) : structured_type =
   in
   base_to_structured_type (Intersection intersection)
 
-let get_flat_union_type (union_types: structured_type list): flat_union_type =
+let get_flat_union_type (union_types : structured_type list) : flat_union_type =
   let union_type = get_type_union union_types in
   List.map
     (fun base_type ->
@@ -75,7 +75,9 @@ let build_fix (arg_type : union_type) (return_type : union_type) =
                            Abstraction
                              [
                                ( union_to_structured_type arg_type,
-                               Application( Application (Variable 1, Variable 1), Variable 0) );
+                                 Application
+                                   ( Application (Variable 1, Variable 1),
+                                     Variable 0 ) );
                              ] ) );
                    ],
                  Abstraction
@@ -86,7 +88,9 @@ let build_fix (arg_type : union_type) (return_type : union_type) =
                            Abstraction
                              [
                                ( union_to_structured_type arg_type,
-                                 Application( Application (Variable 1, Variable 1), Variable 0) );
+                                 Application
+                                   ( Application (Variable 1, Variable 1),
+                                     Variable 0 ) );
                              ] ) );
                    ] ) );
          ])
@@ -94,6 +98,6 @@ let build_fix (arg_type : union_type) (return_type : union_type) =
   fix
 
 (* Fixes a provided abstraction with the given arg and return type *)
-let fix (arg_type: union_type) (return_type: union_type) (term: term) =
+let fix (arg_type : union_type) (return_type : union_type) (term : term) =
   let fix_term = build_fix arg_type return_type in
-  Application(fix_term.term, term)
+  Application (fix_term.term, term)

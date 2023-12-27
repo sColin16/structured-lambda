@@ -1,11 +1,12 @@
 open LambdaCalculus.Structured.TermOperations.Eval
+open LambdaCalculus.Structured.TermOperations.ValToTerm
 open LambdaCalculus.Structured.TypeOperations.Subtype
 open LambdaCalculus.StructuredBool
 
 let test (name : string) (result : bool) =
   Printf.printf "%s: %s\n" (if result then "PASS" else "FAIL") name
 
-let evaluates_to term value = eval term = value
+let evaluates_to term value = value_to_term (eval term) = value
 
 let () =
   test "identity is unary bool op"
