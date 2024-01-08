@@ -5,3 +5,4 @@ module StructuredMixed = StructuredMixed
 module StructuredUnions = StructuredUnions
 module StructuredRecursive = StructuredRecursive
 module StructuredHelpers = StructuredHelpers
+module StructuredPoly = StructuredPoly

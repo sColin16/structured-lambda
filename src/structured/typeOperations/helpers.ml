@@ -21,14 +21,21 @@ let flatten_base (context : recursive_context) (base_type : base_type) :
   match base_type with
   | Label a -> [ FLabel a ]
   | Intersection a -> [ FIntersection a ]
-  | TypeVar n -> (get_type_from_context n context).flat_union
+  | UnivTypeVar a -> [ FUnivTypeVar a ]
+  | UnivQuantification a -> [ FUnivQuantification a ]
+  | RecTypeVar n -> (get_type_from_context n context).flat_union
 
 let flatten_union (union : union_type) (context : recursive_context) :
     flat_union_type =
   List.flatten (List.map (flatten_base context) union)
 
+(* TODO: is there a way to define these two types and this mapping as part of the type to avoid mistakes? *)
 let unflatten_base (flat_base : flat_base_type) : base_type =
-  match flat_base with FLabel a -> Label a | FIntersection a -> Intersection a
+  match flat_base with
+  | FLabel a -> Label a
+  | FIntersection a -> Intersection a
+  | FUnivTypeVar a -> UnivTypeVar a
+  | FUnivQuantification a -> UnivQuantification a
 
 let unflatten_union (flat_union : flat_union_type) : union_type =
   List.map unflatten_base flat_union

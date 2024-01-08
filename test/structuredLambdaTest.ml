@@ -3,6 +3,7 @@ open LambdaCalculus.Structured.TermOperations.Typing
 open LambdaCalculus.Structured.TypeOperations.Subtype
 open LambdaCalculus.Structured.TypeOperations.Intersection
 open LambdaCalculus.StructuredHelpers
+open TypeOperations.Union
 
 let test (name : string) (result : bool) =
   Printf.printf "%s: %s\n" (if result then "PASS" else "FAIL") name

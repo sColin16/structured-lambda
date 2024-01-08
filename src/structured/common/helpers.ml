@@ -54,3 +54,6 @@ let short_circuit_and (exp1: unit -> bool) (exp2: unit -> bool) =
 
 let short_circuit_or (exp1: unit -> bool) (exp2: unit -> bool) =
   if exp1() then true else exp2 ()
+
+let map_pair (func: 'a -> 'b) (first, second: 'a * 'a): 'b * 'b =
+  (func first), (func second)

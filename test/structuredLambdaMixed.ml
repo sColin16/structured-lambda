@@ -1,6 +1,7 @@
 open LambdaCalculus.Structured.TermOperations.Eval
 open LambdaCalculus.Structured.TermOperations.ValToTerm
 open LambdaCalculus.Structured.TypeOperations.Subtype
+open LambdaCalculus.Structured.TypeOperations.Union
 open LambdaCalculus.StructuredArithmetic
 open LambdaCalculus.StructuredBool
 open LambdaCalculus.StructuredMixed

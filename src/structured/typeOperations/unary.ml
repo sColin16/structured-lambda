@@ -14,7 +14,7 @@ let rec is_unary (t : structured_type) = is_unary_rec t TypeVarSet.empty
 and is_unary_rec (t : structured_type) (encountered_type_vars : TypeVarSet.t) =
   let type_var_num =
     if List.length t.union = 1 then
-      match List.hd t.union with TypeVar n -> Some n | _ -> None
+      match List.hd t.union with RecTypeVar n -> Some n | _ -> None
     else None
   in
   let is_type_var = Option.is_some type_var_num in
@@ -50,7 +50,16 @@ and is_unary_rec (t : structured_type) (encountered_type_vars : TypeVarSet.t) =
                 && is_unary_rec
                      (build_structured_type return t.context)
                      new_encountered_vars)
-              functions)
+              functions
+        (* Universally quantified variables can't be unary, even with bounding, because you can always intersect
+           the bound with a type that involves a union to obtain a valid subtype under the bound *)
+        | FUnivTypeVar _ -> false
+        (* Universal quantification is unary if its contents are unary. Like with well-foundedness, this means
+           you can't reference the variable inside of the quantification, so unclear how useful this is *)
+        | FUnivQuantification univ_union ->
+            is_unary_rec
+              (build_structured_type univ_union t.context)
+              encountered_type_vars)
     (* A multiple type union is not considered unary. In theory it may be possible to rewrite as a single base type
        but we can do that later *)
     | _ :: _ -> false

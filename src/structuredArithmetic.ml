@@ -1,4 +1,5 @@
 open StructuredHelpers
+open TypeOperations.Union
 
 let zero = get_typed_term_unsafe (Const "Zero")
 let one = get_typed_term_unsafe (Const "One")

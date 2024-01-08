@@ -25,17 +25,23 @@ and is_base_union_subtype ((t1, c1) : base_type * recursive_context)
   | Label a -> is_label_union_subtype a t2
   | Intersection functions ->
       is_function_union_subtype (functions, c1) t2 encountered_type_vars
-  | TypeVar n -> is_typevar_union_subtype (n, c1) t2 encountered_type_vars
+  | RecTypeVar n -> is_typevar_union_subtype (n, c1) t2 encountered_type_vars
+  | UnivTypeVar n -> is_univ_var_union_subtype (n, c1) t2
+  | UnivQuantification univ_union ->
+      is_univ_quant_union_subtype (univ_union, c1) t2 encountered_type_vars
 
 and is_label_union_subtype (label : string) (t : structured_type) =
   let flat_union = flatten_union t.union t.context in
   (* A label is a subtype of an equivalent label in the union, or the top type *)
   List.exists
-    (fun flat_union_elt ->
-      match flat_union_elt with
+    (function
       | FLabel a -> a = label
       | FIntersection [] -> true
-      | FIntersection (_ :: _) -> false)
+      | FIntersection (_ :: _) -> false
+      (* Labels aren't necessarily a subtype of a universal type variable *)
+      | FUnivTypeVar _ -> false
+      (* Labels definitely aren't a subtype of universal quantification, they're distinct terms *)
+      | FUnivQuantification _ -> false)
     flat_union
 
 and is_function_union_subtype
@@ -49,17 +55,19 @@ and is_function_union_subtype
       (fun base_type ->
         match base_type with
         | FLabel _ -> None
-        | FIntersection functions -> Some functions)
+        | FIntersection functions -> Some functions
+        (* Universal type variables and quantifications can't be supertypes of function types either *)
+        | FUnivTypeVar _ | FUnivQuantification _ -> None)
       flat_union
   in
   (* First, check if there a intersection types in the union that is a supertype directly *)
-  let is_direct_subtype = fun () ->
+  let is_direct_subtype () =
     is_function_subtype_direct (functions, context1)
       (union_of_intersections, t.context)
       encountered_type_vars
   in
   (* Then, check if it's an indirect subtype of the entire union *)
-  let is_indirect_subtype = fun () ->
+  let is_indirect_subtype () =
     is_function_subtype_indirect (functions, context1)
       (union_of_intersections, t.context)
       encountered_type_vars
@@ -71,10 +79,10 @@ and is_typevar_union_subtype ((var_num, context1) : int * recursive_context)
     (t : structured_type) (encountered_type_vars : TypeVarUnionSet.t) =
   let union_contains_typevars =
     List.exists
-      (fun base_type ->
-        match base_type with
-        | TypeVar _ -> true
-        | Label _ | Intersection _ -> false)
+      (function
+        | RecTypeVar _ -> true
+        | Label _ | Intersection _ | UnivQuantification _ | UnivTypeVar _ ->
+            false)
       t.union
   in
   let var_num_kind = (List.nth context1 var_num).kind in
@@ -84,12 +92,15 @@ and is_typevar_union_subtype ((var_num, context1) : int * recursive_context)
     union_contains_typevars
     && TypeVarUnionSet.mem (var_num, t.union) encountered_type_vars
   then
-    let union_has_coinductive = List.exists
-      (fun base_type ->
-        match base_type with
-        | TypeVar n -> ((List.nth t.context n).kind = Coinductive)
-        | Label _ | Intersection _ -> false)
-      t.union in
+    let union_has_coinductive =
+      List.exists
+        (fun base_type ->
+          match base_type with
+          | RecTypeVar n -> (List.nth t.context n).kind = Coinductive
+          | Label _ | Intersection _ | UnivTypeVar _ | UnivQuantification _ ->
+              false)
+        t.union
+    in
     match var_num_kind with
     (* Coinductive loops are valid if there is at least one coinductive type on the other side *)
     | Coinductive -> union_has_coinductive
@@ -109,6 +120,36 @@ and is_typevar_union_subtype ((var_num, context1) : int * recursive_context)
     let flat_union = to_contractive_type t.union t.context in
     (* Then recurse on the two expanded unions, determining if they are subtypes *)
     is_subtype_union_rec expanded_type_var flat_union new_encountered_var
+
+(* I may use the context in the future for bounded polymorphism, so I am keeping it for now *)
+and is_univ_var_union_subtype ((univ_var_num, _) : int * recursive_context)
+    (t : structured_type) =
+  let flat_union = flatten_union t.union t.context in
+  (* Without bounded quantification, universal type variables are only subtypes
+     of themselves, or the top type *)
+  List.exists
+    (function
+      | FIntersection [] -> true
+      | FUnivTypeVar n -> n = univ_var_num
+      | FLabel _ | FIntersection (_ :: _) | FUnivQuantification _ -> false)
+    flat_union
+
+and is_univ_quant_union_subtype
+    ((univ_union, context1) : union_type * recursive_context)
+    (t : structured_type) (encountered_type_vars : TypeVarUnionSet.t) =
+  let flat_union = flatten_union t.union t.context in
+  (* Without bounded quantification, universal quantification are only subtypes of the top type,
+     and universal quantification whose contents are subtypes *)
+  List.exists
+    (function
+      | FIntersection [] -> true
+      | FUnivQuantification univ_union2 ->
+          is_subtype_union_rec
+            (build_structured_type univ_union context1)
+            (build_structured_type univ_union2 t.context)
+            encountered_type_vars
+      | FLabel _ | FIntersection (_ :: _) | FUnivTypeVar _ -> false)
+    flat_union
 
 (* Returns the compound structure. Must be able to union the compound structure *)
 and is_function_subtype_direct
@@ -160,14 +201,14 @@ and is_intersection_subtype
   let second_args = extract_composite_args functions2 in
   let function_pairs = list_product functions1 functions2 in
   (* The function1's argument types (unioned together) must be a supertype of function2's argument types (unioned together) *)
-  let exhaustive_arg_coverage = fun () ->
+  let exhaustive_arg_coverage () =
     is_subtype_union_rec
       (build_structured_type second_args context2)
       (build_structured_type first_args context1)
       encountered_type_vars
   in
   (* Every pair of unary functions must be "subtype compatible," returning a subtype if the arg types intersect *)
-  let return_type_constraint_met = fun() ->
+  let return_type_constraint_met () =
     List.for_all
       (fun (func1, func2) ->
         is_func_subtype_compatible (func1, context1) (func2, context2)
@@ -219,12 +260,13 @@ and is_func_subtype_compatible
     (((arg1, return1), context1) : unary_function * recursive_context)
     (((arg2, return2), context2) : unary_function * recursive_context)
     (encountered_type_vars : TypeVarUnionSet.t) =
-  let args_dont_intersect = fun () -> not
-    (has_intersection
-      (build_structured_type arg1 context1)
-      (build_structured_type arg2 context2))
+  let args_dont_intersect () =
+    not
+      (has_intersection
+         (build_structured_type arg1 context1)
+         (build_structured_type arg2 context2))
   in
-  let return_subtype = fun () ->
+  let return_subtype () =
     is_subtype_union_rec
       (build_structured_type return1 context1)
       (build_structured_type return2 context2)
