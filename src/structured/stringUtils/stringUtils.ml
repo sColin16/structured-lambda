@@ -60,9 +60,9 @@ let rec term_to_string (term : term) =
       Printf.sprintf "\\.{%s}" (String.concat "," branch_strings)
   | Application (t1, t2) ->
       Printf.sprintf "(%s) (%s)" (term_to_string t1) (term_to_string t2)
-  | TypeAbstraction inner_term ->
+  | UnivQuantifier inner_term ->
       Printf.sprintf "\\T.{%s}" (term_to_string inner_term)
-  | TypeApplication (inner_term, inner_type) ->
+  | UnivApplication (inner_term, inner_type) ->
       Printf.sprintf "(%s) [%s]" (term_to_string inner_term) (type_to_string inner_type)
 
 and branch_to_string (branch_type, branch_body) =

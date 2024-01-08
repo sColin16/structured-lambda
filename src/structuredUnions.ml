@@ -1,6 +1,7 @@
 open Structured.TermTypes
 open StructuredHelpers
 open StructuredBool
+open TypeOperations.Union
 
 let split_unary_bool =
   base_to_structured_type

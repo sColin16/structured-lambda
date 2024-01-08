@@ -5,6 +5,7 @@ open LambdaCalculus.StructuredBool
 open LambdaCalculus.StructuredUnions
 open LambdaCalculus.StructuredHelpers
 open LambdaCalculus.Structured.TermOperations.ValToTerm
+open TypeOperations.Union
 
 let test (name : string) (result : bool) =
   Printf.printf "%s: %s\n" (if result then "PASS" else "FAIL") name

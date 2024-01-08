@@ -1,4 +1,5 @@
 open StructuredHelpers
+open TypeOperations.Union
 
 let true_lambda = get_typed_term_unsafe (Const "True")
 let false_lambda = get_typed_term_unsafe (Const "False")

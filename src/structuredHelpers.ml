@@ -1,24 +1,14 @@
 open Structured.Metatypes
 open Structured.TermTypes
-open Structured.TypeOperations.Context
 open Structured.TypeOperations.Create
 open Structured.TermOperations.Typing
+open Structured.TypeOperations.Union
 
 type typed_term = { term : term; stype : structured_type }
 
 let build_typed_term (term : term) (stype : structured_type) = { term; stype }
 let get_type_unsafe term = Option.get (get_type term)
 let get_typed_term_unsafe term = build_typed_term term (get_type_unsafe term)
-
-let get_type_union (types : structured_type list) : structured_type =
-  let union_type, recursive_context =
-    List.fold_left
-      (fun (acc_union_type, acc_recursive_context) next_type ->
-        let new_type = get_type_in_context next_type acc_recursive_context in
-        (acc_union_type @ new_type.union, new_type.context))
-      ([], []) types
-  in
-  build_structured_type union_type recursive_context
 
 let union_to_structured_type (union_type : union_type) =
   build_structured_type union_type []
@@ -49,7 +39,9 @@ let get_flat_union_type (union_types : structured_type list) : flat_union_type =
     (function
       | Label a -> FLabel a
       | Intersection a -> FIntersection a
-      | _ -> raise (Invalid_argument "got non-flat type"))
+      | UnivTypeVar a -> FUnivTypeVar a
+      | UnivQuantification a -> FUnivQuantification a
+      | RecTypeVar _ -> raise (Invalid_argument "got non-flat type"))
     union_type.union
 
 (* Constructs the Z-combinator for a function of a given type, a fixed-point
@@ -58,7 +50,7 @@ let build_fix (arg_type : union_type) (return_type : union_type) =
   let func_type = (func_to_structured_type (arg_type, return_type)).union in
   let fix_context =
     build_recursive_context
-      [ (Coinductive, [ FIntersection [ ([ TypeVar 0 ], func_type) ] ]) ]
+      [ (Coinductive, [ FIntersection [ ([ RecTypeVar 0 ], func_type) ] ]) ]
   in
   let fix =
     get_typed_term_unsafe
@@ -68,7 +60,7 @@ let build_fix (arg_type : union_type) (return_type : union_type) =
              Application
                ( Abstraction
                    [
-                     ( build_structured_type [ TypeVar 0 ] fix_context,
+                     ( build_structured_type [ RecTypeVar 0 ] fix_context,
                        Application
                          ( Variable 1,
                            Abstraction
@@ -81,7 +73,7 @@ let build_fix (arg_type : union_type) (return_type : union_type) =
                    ],
                  Abstraction
                    [
-                     ( build_structured_type [ TypeVar 0 ] fix_context,
+                     ( build_structured_type [ RecTypeVar 0 ] fix_context,
                        Application
                          ( Variable 1,
                            Abstraction

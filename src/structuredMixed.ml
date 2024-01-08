@@ -1,6 +1,7 @@
 open StructuredHelpers
 open StructuredArithmetic
 open StructuredBool
+open TypeOperations.Union
 
 let is_even_label = get_typed_term_unsafe (Const "isEven")
 let is_odd_label = get_typed_term_unsafe (Const "isOdd")

@@ -7,7 +7,8 @@
   structuredLambdaBoolean
   structuredLambdaMixed
   structuredLambdaRecursive
-  structuredLambdaUnions)
+  structuredLambdaUnions
+  structuredLambdaPoly)
  (libraries lambdaCalculus))
 
 (env
